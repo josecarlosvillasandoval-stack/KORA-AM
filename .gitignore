@@ -1,1 +1,6 @@
 .env.local
+
+# Secrets (never commit)
+secrets/
+*.key
+*.pem
