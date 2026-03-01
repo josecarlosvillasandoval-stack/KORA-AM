@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KORA AM — PRY-002 Mártires 122</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --black:      #000000;
+  --graphite:   #2b2b2b;
+  --terra:      #926031;
+  --terra-lt:   #b8895a;
+  --bronze:     #8a7b66;
+  --alabaster:  #ede5db;
+  --alabaster2: #f5f0ea;
+  --white:      #ffffff;
+  --border:     #ddd5c8;
+  --muted:      #8a7b66;
+  --success:    #4a7c5a;
+  --success-bg: #eaf2ec;
+  --warning:    #b87333;
+  --warning-bg: #fdf3ea;
+  --danger:     #9b3a3a;
+  --danger-bg:  #fbeaea;
+  --info:       #3a6b9b;
+  --info-bg:    #eaf0f8;
+
+  --font-head: 'Montserrat', 'Futura PT', sans-serif;
+  --font-body: 'Inter', 'General Sans', sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--alabaster2);
+  color: var(--graphite);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ── TOPBAR ─────────────────────────────────────────────────── */
+.topbar {
+  background: var(--black);
+  padding: 0 32px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.topbar-logo { height: 28px; width: auto; display: block; }
+.topbar-right { display: flex; align-items: center; gap: 24px; }
+.topbar-label { font-family: var(--font-head); font-size: 10px; font-weight: 500; letter-spacing: 2.5px; text-transform: uppercase; color: var(--bronze); }
+.topbar-pill { background: var(--terra); color: var(--white); font-family: var(--font-head); font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 4px 12px; border-radius: 1px; }
+.topbar-time { font-family: var(--font-body); font-size: 11px; color: var(--bronze); font-weight: 300; }
+.refresh-btn { background: none; border: 1px solid #333; color: var(--bronze); font-family: var(--font-head); font-size: 10px; letter-spacing: 1px; padding: 5px 14px; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+.refresh-btn:hover { border-color: var(--terra); color: var(--terra); }
+
+/* ── SUBHEADER ──────────────────────────────────────────────── */
+.subheader { background: var(--graphite); padding: 12px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #3a3a3a; }
+.subheader-title { font-family: var(--font-head); font-size: 11px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--alabaster); }
+.subheader-meta { display: flex; gap: 32px; }
+.subheader-item { font-size: 10px; color: var(--bronze); letter-spacing: 0.5px; }
+.subheader-item span { color: var(--alabaster); font-weight: 500; margin-left: 6px; }
+
+/* ── MAIN CONTENT ───────────────────────────────────────────── */
+.content { padding: 28px 32px; max-width: 1700px; margin: 0 auto; }
+
+/* ── SECTION LABEL ──────────────────────────────────────────── */
+.section-label {
+  font-family: var(--font-head);
+  font-size: 9px; font-weight: 700; letter-spacing: 3px;
+  text-transform: uppercase; color: var(--bronze);
+  margin-bottom: 14px; padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.section-label::before { content: ''; display: block; width: 16px; height: 2px; background: var(--terra); }
+
+/* ── CARD ───────────────────────────────────────────────────── */
+.card { background: var(--white); border: 1px solid var(--border); padding: 22px 24px; }
+
+/* ── KPI GRID ───────────────────────────────────────────────── */
+.kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px; background: var(--border); margin-bottom: 24px; }
+.kpi-cell { background: var(--white); padding: 20px 22px 18px; position: relative; cursor: pointer; transition: background 0.15s; }
+.kpi-cell:hover { background: #fdf9f5; }
+.kpi-cell::after { content: ''; position: absolute; bottom: 0; left: 22px; right: 22px; height: 2px; background: transparent; transition: background 0.3s; }
+.kpi-cell.terra::after { background: var(--terra); }
+.kpi-cell.bronze::after { background: var(--bronze); }
+.kpi-cell.success::after { background: var(--success); }
+.kpi-label { font-family: var(--font-head); font-size: 8px; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.kpi-value { font-family: var(--font-head); font-size: 26px; font-weight: 300; color: var(--black); line-height: 1; margin-bottom: 6px; }
+.kpi-value.accent { color: var(--terra); }
+.kpi-value.success { color: var(--success); }
+.kpi-sub { font-size: 10px; color: var(--muted); margin-bottom: 10px; }
+.kpi-bar-track { height: 2px; background: var(--alabaster); width: 100%; overflow: hidden; }
+.kpi-bar-fill { height: 100%; background: var(--terra); transition: width 1s ease; }
+.kpi-bar-fill.bronze { background: var(--bronze); }
+.kpi-bar-fill.success { background: var(--success); }
+.kpi-pct { font-family: var(--font-head); font-size: 10px; font-weight: 600; color: var(--terra); margin-top: 4px; }
+.kpi-drill-hint { font-size: 9px; color: var(--border); position: absolute; top: 14px; right: 16px; letter-spacing: 0.5px; transition: color 0.2s; }
+.kpi-cell:hover .kpi-drill-hint { color: var(--bronze); }
+
+/* ── LAYOUT ─────────────────────────────────────────────────── */
+.row-2 { display: grid; grid-template-columns: 1.7fr 1fr; gap: 16px; margin-bottom: 24px; }
+.row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.row-2-eq { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+.chart-wrap { position: relative; height: 220px; }
+.chart-wrap-sm { position: relative; height: 180px; }
+
+/* ── MES PROGRESS ───────────────────────────────────────────── */
+.mes-block { display: flex; align-items: center; gap: 20px; padding: 16px 22px; background: var(--black); color: var(--white); margin-bottom: 24px; }
+.mes-num { font-family: var(--font-head); font-size: 42px; font-weight: 700; color: var(--terra); line-height: 1; min-width: 56px; }
+.mes-info { flex: 1; }
+.mes-title { font-family: var(--font-head); font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: var(--alabaster); margin-bottom: 6px; }
+.mes-sub { font-size: 10px; color: var(--bronze); }
+.mes-track { flex: 2; }
+.mes-bar-wrap { height: 3px; background: #333; width: 100%; }
+.mes-bar { height: 100%; background: var(--terra); transition: width 1s ease; }
+.mes-range { display: flex; justify-content: space-between; font-size: 9px; color: #555; margin-top: 5px; letter-spacing: 1px; }
+
+/* ── WATERFALL ──────────────────────────────────────────────── */
+.wf-item { padding: 14px 0; border-bottom: 1px solid var(--alabaster); }
+.wf-item:last-child { border-bottom: none; }
+.wf-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.wf-tranche { font-family: var(--font-head); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--graphite); }
+.wf-amounts { display: flex; gap: 20px; flex-wrap: wrap; }
+.wf-amount { font-size: 10px; color: var(--muted); }
+.wf-amount b { color: var(--graphite); font-weight: 600; }
+.wf-bar-track { height: 3px; background: var(--alabaster); width: 100%; }
+.wf-bar-fill { height: 100%; background: var(--terra); transition: width 1s ease; }
+.wf-bar-fill.b { background: var(--bronze); }
+.wf-bar-fill.c { background: #b8a898; }
+
+/* ── HITOS ──────────────────────────────────────────────────── */
+.hito { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--alabaster2); }
+.hito:last-child { border-bottom: none; }
+.hito-icon { width: 6px; height: 6px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
+.hito-icon.done { background: var(--success); }
+.hito-icon.pending { background: var(--border); }
+.hito-text { flex: 1; font-size: 11px; color: var(--graphite); line-height: 1.4; }
+.hito-date { font-size: 10px; color: var(--muted); white-space: nowrap; font-weight: 300; }
+
+/* ── AVANCE ─────────────────────────────────────────────────── */
+.avance-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+.avance-label { font-size: 10px; color: var(--muted); width: 52px; text-align: right; flex-shrink: 0; }
+.avance-track { flex: 1; height: 8px; background: var(--alabaster); position: relative; overflow: hidden; }
+.avance-obj { position: absolute; left: 0; top: 0; height: 100%; background: var(--alabaster); border: 1px solid var(--border); }
+.avance-real { position: absolute; left: 0; top: 0; height: 100%; background: var(--terra); opacity: 0.8; transition: width 1s ease; }
+.avance-pct { font-size: 10px; color: var(--terra); font-weight: 600; width: 30px; text-align: right; flex-shrink: 0; }
+
+/* ── ────────────────────────────────────────────────────────── */
+/* ── DRILL-DOWN SYSTEM ──────────────────────────────────────── */
+/* ── ────────────────────────────────────────────────────────── */
+
+/* Tab nav */
+.drill-section { margin-top: 36px; }
+.drill-section-hdr {
+  font-family: var(--font-head); font-size: 9px; font-weight: 700;
+  letter-spacing: 3px; text-transform: uppercase; color: var(--white);
+  background: var(--graphite); padding: 14px 24px;
+  display: flex; align-items: center; gap: 12px;
+}
+.drill-section-hdr::before { content: ''; display: block; width: 16px; height: 2px; background: var(--terra); }
+
+.tab-nav {
+  display: flex; background: var(--white);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  position: sticky; top: 64px; z-index: 100;
+}
+.tab-btn {
+  flex-shrink: 0;
+  font-family: var(--font-head); font-size: 9px; font-weight: 600;
+  letter-spacing: 2px; text-transform: uppercase;
+  padding: 14px 22px; cursor: pointer;
+  border: none; background: none; color: var(--muted);
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s; white-space: nowrap;
+}
+.tab-btn:hover { color: var(--graphite); }
+.tab-btn.active { color: var(--terra); border-bottom-color: var(--terra); }
+.tab-count { display: inline-block; background: var(--alabaster); color: var(--bronze); font-size: 8px; padding: 1px 5px; border-radius: 8px; margin-left: 5px; font-weight: 700; }
+.tab-btn.active .tab-count { background: var(--terra); color: var(--white); }
+
+/* Tab panels */
+.tab-panel { display: none; padding: 24px; background: var(--white); border: 1px solid var(--border); border-top: none; }
+.tab-panel.active { display: block; }
+
+/* Summary strip inside tab */
+.tab-summary {
+  display: grid; gap: 1px;
+  background: var(--border);
+  margin-bottom: 24px;
+}
+.tab-summary.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.tab-summary.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.tab-summary.cols-5 { grid-template-columns: repeat(5, 1fr); }
+.ts-cell { background: var(--alabaster2); padding: 14px 18px; }
+.ts-label { font-family: var(--font-head); font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.ts-value { font-family: var(--font-head); font-size: 20px; font-weight: 400; color: var(--black); }
+.ts-value.accent { color: var(--terra); }
+.ts-value.success { color: var(--success); }
+.ts-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* Table toolbar */
+.tbl-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px; gap: 12px; flex-wrap: wrap;
+}
+.tbl-search {
+  font-family: var(--font-body); font-size: 12px; padding: 7px 12px;
+  border: 1px solid var(--border); background: var(--alabaster2); color: var(--graphite);
+  width: 240px; outline: none;
+  transition: border-color 0.2s;
+}
+.tbl-search:focus { border-color: var(--terra); }
+.tbl-info { font-size: 11px; color: var(--muted); }
+.tbl-empty { text-align: center; padding: 40px; font-size: 12px; color: var(--muted); font-style: italic; }
+
+/* Data table */
+.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.data-table th {
+  font-family: var(--font-head); font-size: 8px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--white);
+  background: var(--graphite); padding: 10px 14px; text-align: left;
+  cursor: pointer; white-space: nowrap; user-select: none;
+  position: relative;
+}
+.data-table th:hover { background: #3a3a3a; }
+.data-table th.sorted-asc::after  { content: ' ↑'; color: var(--terra-lt); }
+.data-table th.sorted-desc::after { content: ' ↓'; color: var(--terra-lt); }
+.data-table td {
+  padding: 9px 14px; border-bottom: 1px solid var(--alabaster);
+  vertical-align: middle; white-space: nowrap;
+}
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tbody tr { cursor: pointer; transition: background 0.1s; }
+.data-table tbody tr:hover { background: #fdf9f5; }
+.data-table tbody tr.selected { background: #fdf3e7; }
+.data-table .num { text-align: right; font-family: var(--font-mono); font-size: 11px; }
+.data-table .muted { color: var(--muted); }
+.data-table .bold { font-weight: 600; color: var(--graphite); }
+.data-table .terra { color: var(--terra); font-weight: 600; }
+.data-table .success-text { color: var(--success); }
+
+/* Status badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: var(--font-head); font-size: 8px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  padding: 3px 9px; border-radius: 1px; white-space: nowrap;
+}
+.badge::before { content: ''; display: block; width: 5px; height: 5px; border-radius: 50%; }
+.badge.recibido   { background: var(--success-bg); color: var(--success);  } .badge.recibido::before   { background: var(--success); }
+.badge.firmado    { background: var(--success-bg); color: var(--success);  } .badge.firmado::before    { background: var(--success); }
+.badge.completado { background: var(--success-bg); color: var(--success);  } .badge.completado::before { background: var(--success); }
+.badge.en-proceso { background: var(--info-bg);    color: var(--info);     } .badge.en-proceso::before { background: var(--info); }
+.badge.pendiente  { background: var(--warning-bg); color: var(--warning);  } .badge.pendiente::before  { background: var(--warning); }
+.badge.vencido    { background: var(--danger-bg);  color: var(--danger);   } .badge.vencido::before    { background: var(--danger); }
+.badge.cancelado  { background: #f0f0f0;            color: #888;            } .badge.cancelado::before  { background: #bbb; }
+.badge.pagado     { background: var(--success-bg); color: var(--success);  } .badge.pagado::before     { background: var(--success); }
+.badge.default    { background: var(--alabaster);  color: var(--muted);    } .badge.default::before    { background: var(--bronze); }
+
+/* Variance pill (ppto vs real) */
+.var-pos { color: var(--success); font-size: 10px; font-weight: 600; }
+.var-neg { color: var(--danger);  font-size: 10px; font-weight: 600; }
+
+/* ── DETAIL DRAWER ───────────────────────────────────────────── */
+.drawer-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4); z-index: 300;
+  animation: fadeIn 0.2s ease;
+}
+.drawer-overlay.open { display: block; }
+.drawer {
+  position: fixed; right: 0; top: 0; bottom: 0;
+  width: 440px; background: var(--white);
+  overflow-y: auto; z-index: 301;
+  transform: translateX(100%); transition: transform 0.25s ease;
+  box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+}
+.drawer-overlay.open .drawer { transform: translateX(0); }
+.drawer-header {
+  background: var(--black); padding: 20px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 1;
+}
+.drawer-title { font-family: var(--font-head); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--alabaster); }
+.drawer-close { background: none; border: none; color: var(--bronze); cursor: pointer; font-size: 20px; line-height: 1; padding: 0 4px; }
+.drawer-close:hover { color: var(--white); }
+.drawer-body { padding: 24px; }
+.drawer-section { margin-bottom: 20px; }
+.drawer-section-title { font-family: var(--font-head); font-size: 8px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--bronze); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.drawer-field { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--alabaster2); }
+.drawer-field:last-child { border-bottom: none; }
+.drawer-key { font-size: 11px; color: var(--muted); flex: 1; }
+.drawer-val { font-size: 12px; color: var(--graphite); font-weight: 500; text-align: right; flex: 1.5; }
+.drawer-val.big { font-family: var(--font-head); font-size: 18px; font-weight: 400; color: var(--terra); }
+.drawer-val.mono { font-family: var(--font-mono); }
+
+/* ── FOOTER ─────────────────────────────────────────────────── */
+.footer { background: var(--black); padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
+.footer-text { font-size: 9px; color: #444; letter-spacing: 1px; text-transform: uppercase; }
+
+/* ── LOADING ─────────────────────────────────────────────────── */
+#loading { position: fixed; inset: 0; background: var(--black); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; }
+#loading .l-logo { height: 36px; margin-bottom: 24px; }
+#loading .l-bar { width: 200px; height: 1px; background: #222; }
+#loading .l-fill { height: 100%; background: var(--terra); animation: loadbar 1.2s ease forwards; }
+@keyframes loadbar { from { width: 0 } to { width: 100% } }
+@keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+.hidden { display: none !important; }
+
+/* ── RESPONSIVE ─────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+  .row-2, .row-3 { grid-template-columns: 1fr; }
+  .tab-summary.cols-5 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 768px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .topbar { padding: 0 16px; }
+  .content { padding: 16px; }
+  .drawer { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <svg class="l-logo" viewBox="0 0 513.95 179.74" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <style>.lc{fill:#eae4da}</style>
+    <g class="lc">
+      <polygon points="26.14 36.1 16.59 46.85 0 65.52 0 0 26.14 0 26.14 36.1"/>
+      <polygon points="124.85 129.11 89.84 129.11 78.43 116.29 52.28 86.93 43.05 76.56 26.14 95.59 0 125.01 0 85.64 25.54 56.9 26.14 56.23 43.03 37.22 52.28 47.62 60.54 56.88 78.43 76.98 104.58 106.34 124.85 129.11"/>
+      <polygon points="111.08 0 104.58 7.32 78.43 36.74 69.27 47.05 51.76 27.36 52.28 26.81 76.11 0 111.08 0"/>
+      <path d="M188.03,131.3c-12.75,0-23.91-2.38-33.49-7.15-9.58-4.77-17.05-11.4-22.4-19.92-5.35-8.51-8.03-18.46-8.03-29.84s2.67-21.33,8.03-29.84c5.35-8.51,12.82-15.15,22.4-19.92,9.58-4.77,20.74-7.15,33.49-7.15s23.91,2.38,33.49,7.15c9.58,4.77,17.05,11.41,22.4,19.92,5.35,8.51,8.03,18.46,8.03,29.84s-2.68,21.33-8.03,29.84c-5.35,8.51-12.82,15.15-22.4,19.92-9.58,4.77-20.75,7.15-33.49,7.15ZM188.03,109.26c7.98,0,14.86-1.41,20.65-4.23,5.79-2.82,10.26-6.86,13.42-12.11,3.16-5.25,4.74-11.43,4.74-18.53s-1.58-13.28-4.74-18.53c-3.16-5.25-7.64-9.29-13.42-12.11-5.79-2.82-12.67-4.23-20.65-4.23s-14.74,1.41-20.57,4.23c-5.84,2.82-10.34,6.86-13.5,12.11-3.16,5.25-4.74,11.43-4.74,18.53s1.58,13.28,4.74,18.53c3.16,5.25,7.66,9.29,13.5,12.11,5.84,2.82,12.69,4.23,20.57,4.23Z"/>
+      <path d="M460.16,19.67l51.22,109.44h-26.41l-44.8-99.37h8.17l-44.8,99.37h-26.41l51.22-109.44h31.81ZM405.73,106.05v-20.14h75.88v20.14h-75.88Z"/>
+    </g>
+  </svg>
+  <div class="l-bar"><div class="l-fill"></div></div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <svg class="topbar-logo" viewBox="0 0 513.95 179.74" xmlns="http://www.w3.org/2000/svg">
+    <style>.tc{fill:#eae4da}</style>
+    <g class="tc">
+      <polygon points="26.14 36.1 16.59 46.85 0 65.52 0 0 26.14 0 26.14 36.1"/>
+      <polygon points="124.85 129.11 89.84 129.11 78.43 116.29 52.28 86.93 43.05 76.56 26.14 95.59 0 125.01 0 85.64 25.54 56.9 26.14 56.23 43.03 37.22 52.28 47.62 60.54 56.88 78.43 76.98 104.58 106.34 124.85 129.11"/>
+      <polygon points="111.08 0 104.58 7.32 78.43 36.74 69.27 47.05 51.76 27.36 52.28 26.81 76.11 0 111.08 0"/>
+      <path d="M188.03,131.3c-12.75,0-23.91-2.38-33.49-7.15-9.58-4.77-17.05-11.4-22.4-19.92-5.35-8.51-8.03-18.46-8.03-29.84s2.67-21.33,8.03-29.84c5.35-8.51,12.82-15.15,22.4-19.92,9.58-4.77,20.74-7.15,33.49-7.15s23.91,2.38,33.49,7.15c9.58,4.77,17.05,11.41,22.4,19.92,5.35,8.51,8.03,18.46,8.03,29.84s-2.68,21.33-8.03,29.84c-5.35,8.51-12.82,15.15-22.4,19.92-9.58,4.77-20.75,7.15-33.49,7.15ZM188.03,109.26c7.98,0,14.86-1.41,20.65-4.23,5.79-2.82,10.26-6.86,13.42-12.11,3.16-5.25,4.74-11.43,4.74-18.53s-1.58-13.28-4.74-18.53c-3.16-5.25-7.64-9.29-13.42-12.11-5.79-2.82-12.67-4.23-20.65-4.23s-14.74,1.41-20.57,4.23c-5.84,2.82-10.34,6.86-13.5,12.11-3.16,5.25-4.74,11.43-4.74,18.53s1.58,13.28,4.74,18.53c3.16,5.25,7.66,9.29,13.5,12.11,5.84,2.82,12.69,4.23,20.57,4.23Z"/>
+      <path d="M286.23,68.26h42.17c5.54,0,9.94-1.29,13.21-3.87,3.26-2.58,4.89-6.15,4.89-10.72s-1.63-8.12-4.89-10.65c-3.26-2.53-7.66-3.79-13.21-3.79h-45.82l11.24-12.69v102.58h-24.81V19.67h62.31c7.97,0,14.98,1.44,21.01,4.3,6.03,2.87,10.75,6.84,14.15,11.89,3.4,5.06,5.11,10.99,5.11,17.8s-1.7,12.6-5.11,17.66c-3.41,5.06-8.12,9.02-14.15,11.89-6.03,2.87-13.04,4.3-21.01,4.3h-45.09v-19.26ZM305.2,77.89h28.31l41.3,51.22h-29.04l-40.57-51.22Z"/>
+      <path d="M460.16,19.67l51.22,109.44h-26.41l-44.8-99.37h8.17l-44.8,99.37h-26.41l51.22-109.44h31.81ZM405.73,106.05v-20.14h75.88v20.14h-75.88Z"/>
+    </g>
+  </svg>
+  <div class="topbar-right">
+    <span class="topbar-label">Asset Management</span>
+    <span class="topbar-pill" id="status-pill">En Construcción</span>
+    <span class="topbar-time" id="topbar-time">—</span>
+    <button class="refresh-btn" onclick="refresh()">↻ Actualizar</button>
+  </div>
+</div>
+
+<!-- SUBHEADER -->
+<div class="subheader">
+  <span class="subheader-title">PRY-002 — Mártires 122</span>
+  <div class="subheader-meta">
+    <span class="subheader-item">Ciudad<span>CDMX</span></span>
+    <span class="subheader-item">Unidades<span>15 deptos</span></span>
+    <span class="subheader-item">Horizonte<span>36 meses</span></span>
+    <span class="subheader-item">Fuente<span id="source-label">—</span></span>
+    <span class="subheader-item">Actualizado<span id="updated-label">—</span></span>
+  </div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- MES ACTUAL -->
+  <div class="mes-block">
+    <div class="mes-num" id="mes-num">—</div>
+    <div class="mes-info">
+      <div class="mes-title" id="mes-label">Cargando...</div>
+      <div class="mes-sub">Mes del proyecto · Inicio Abr 2026 · Cierre Abr 2029</div>
+    </div>
+    <div class="mes-track">
+      <div class="mes-bar-wrap"><div class="mes-bar" id="mes-bar" style="width:0%"></div></div>
+      <div class="mes-range"><span>M0 — ABR 2026</span><span id="mes-pct">—</span><span>M36 — ABR 2029</span></div>
+    </div>
+  </div>
+
+  <!-- KPIs FILA 1 -->
+  <div class="section-label">Resumen Financiero</div>
+  <div class="kpi-grid" style="margin-bottom:24px">
+    <div class="kpi-cell terra" onclick="gotoTab('ventas')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">Revenue Proforma</div>
+      <div class="kpi-value" id="kv-rev-pf">—</div>
+      <div class="kpi-sub">15 unidades · MXN</div>
+    </div>
+    <div class="kpi-cell success" onclick="gotoTab('ventas')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">Revenue Firmado</div>
+      <div class="kpi-value success" id="kv-rev-firm">—</div>
+      <div class="kpi-sub" id="ks-rev-firm">—</div>
+      <div class="kpi-bar-track"><div class="kpi-bar-fill success" id="kb-rev" style="width:0%"></div></div>
+      <div class="kpi-pct" id="kp-rev">—</div>
+    </div>
+    <div class="kpi-cell" onclick="gotoTab('cobranza')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">Cobranza Real</div>
+      <div class="kpi-value" id="kv-cob">—</div>
+      <div class="kpi-sub">enganches · diferidos · residuales</div>
+      <div class="kpi-bar-track"><div class="kpi-bar-fill bronze" id="kb-cob" style="width:0%"></div></div>
+      <div class="kpi-pct" id="kp-cob" style="color:var(--bronze)">—</div>
+    </div>
+    <div class="kpi-cell" onclick="gotoTab('gastos')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">Costo Ejecutado</div>
+      <div class="kpi-value" id="kv-cost">—</div>
+      <div class="kpi-sub" id="ks-cost">de — presupuesto</div>
+      <div class="kpi-bar-track"><div class="kpi-bar-fill" id="kb-cost" style="width:0%;background:var(--bronze)"></div></div>
+      <div class="kpi-pct" id="kp-cost" style="color:var(--bronze)">—</div>
+    </div>
+    <div class="kpi-cell bronze" onclick="gotoTab('presupuesto')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">Margen Bruto PF</div>
+      <div class="kpi-value" id="kv-margin">—</div>
+      <div class="kpi-sub" id="ks-margin">revenue − presupuesto</div>
+    </div>
+  </div>
+
+  <!-- KPIs FILA 2 -->
+  <div class="kpi-grid" style="margin-bottom:32px">
+    <div class="kpi-cell" onclick="gotoTab('ventas')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">Unidades Firmadas</div>
+      <div class="kpi-value" id="kv-units">—</div>
+      <div class="kpi-sub" id="ks-units">de 15 disponibles</div>
+      <div class="kpi-bar-track"><div class="kpi-bar-fill" id="kb-units" style="width:0%"></div></div>
+      <div class="kpi-pct" id="kp-units">—</div>
+    </div>
+    <div class="kpi-cell terra" onclick="gotoTab('capital')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">LP Equity Total</div>
+      <div class="kpi-value accent" id="kv-lp">—</div>
+      <div class="kpi-sub" id="ks-lp">3 tranches · A · B · C</div>
+      <div class="kpi-bar-track"><div class="kpi-bar-fill" id="kb-lp" style="width:0%"></div></div>
+      <div class="kpi-pct" id="kp-lp">—</div>
+    </div>
+    <div class="kpi-cell" onclick="gotoTab('capital')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">LP Payout Target</div>
+      <div class="kpi-value" id="kv-lp-target">—</div>
+      <div class="kpi-sub" id="ks-lp-target">1.5× múltiplo</div>
+    </div>
+    <div class="kpi-cell success" onclick="gotoTab('capital')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">GP Promote Est.</div>
+      <div class="kpi-value success" id="kv-gp">—</div>
+      <div class="kpi-sub">carried interest estimado</div>
+    </div>
+    <div class="kpi-cell" onclick="gotoTab('capital')">
+      <span class="kpi-drill-hint">VER DETALLE →</span>
+      <div class="kpi-label">Múltiplo LP</div>
+      <div class="kpi-value" id="kv-multiple">—</div>
+      <div class="kpi-sub">MOIC objetivo</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="section-label">Flujos y Ventas</div>
+  <div class="row-2">
+    <div class="card">
+      <div class="section-label" style="margin-bottom:16px">Cashflow Acumulado — Proforma vs Real</div>
+      <div class="chart-wrap"><canvas id="chart-cf"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-label" style="margin-bottom:16px">Revenue Firmado por Mes</div>
+      <div class="chart-wrap"><canvas id="chart-ventas"></canvas></div>
+    </div>
+  </div>
+
+  <!-- WATERFALL + AVANCE + HITOS -->
+  <div class="section-label">Estructura de Capital · Obra · Hitos</div>
+  <div class="row-3">
+    <div class="card">
+      <div class="section-label" style="margin-bottom:16px">LP FIFO Waterfall</div>
+      <div id="wf-container"></div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--alabaster);display:flex;justify-content:space-between;">
+        <span style="font-size:10px;color:var(--muted)">Target total: <b style="color:var(--graphite)" id="wf-target">—</b></span>
+        <span style="font-size:10px;color:var(--muted)">GP Promote: <b style="color:var(--terra)" id="wf-gp">—</b></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-label" style="margin-bottom:16px">Avance de Obra</div>
+      <div id="avance-container"></div>
+    </div>
+    <div class="card">
+      <div class="section-label" style="margin-bottom:16px">Hitos del Proyecto</div>
+      <div id="hitos-container"></div>
+    </div>
+  </div>
+
+  <!-- DISTRIBUCIONES -->
+  <div class="section-label">Distribución de Presupuesto</div>
+  <div class="row-2-eq" style="margin-bottom:0">
+    <div class="card">
+      <div class="section-label" style="margin-bottom:16px">Costos por Categoría — Proforma</div>
+      <div class="chart-wrap-sm"><canvas id="chart-costos"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="section-label" style="margin-bottom:16px">Cobranza por Tipo de Pago</div>
+      <div class="chart-wrap-sm"><canvas id="chart-cob-type"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <!-- DRILL-DOWN SECTION                                         -->
+  <!-- ═══════════════════════════════════════════════════════════ -->
+  <div class="drill-section">
+    <div class="drill-section-hdr">Detalle del Modelo Financiero — Registros Completos</div>
+
+    <!-- TAB NAVIGATION -->
+    <div class="tab-nav" id="tab-nav">
+      <button class="tab-btn active" data-tab="capital"      onclick="switchTab('capital')">Capital LP       <span class="tab-count" id="cnt-capital">0</span></button>
+      <button class="tab-btn"        data-tab="ventas"       onclick="switchTab('ventas')">Ventas           <span class="tab-count" id="cnt-ventas">0</span></button>
+      <button class="tab-btn"        data-tab="cobranza"     onclick="switchTab('cobranza')">Cobranza         <span class="tab-count" id="cnt-cobranza">0</span></button>
+      <button class="tab-btn"        data-tab="gastos"       onclick="switchTab('gastos')">Gastos           <span class="tab-count" id="cnt-gastos">0</span></button>
+      <button class="tab-btn"        data-tab="presupuesto"  onclick="switchTab('presupuesto')">Presupuesto      <span class="tab-count" id="cnt-presupuesto">0</span></button>
+      <button class="tab-btn"        data-tab="obra"         onclick="switchTab('obra')">Avance Obra      <span class="tab-count" id="cnt-obra">0</span></button>
+      <button class="tab-btn"        data-tab="hitos"        onclick="switchTab('hitos')">Hitos            <span class="tab-count" id="cnt-hitos">0</span></button>
+      <button class="tab-btn"        data-tab="deuda"        onclick="switchTab('deuda')">Deuda            <span class="tab-count" id="cnt-deuda">0</span></button>
+    </div>
+
+    <!-- TAB: CAPITAL LP -->
+    <div class="tab-panel active" id="tab-capital">
+      <div class="tab-summary cols-4" id="ts-capital"></div>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" placeholder="Buscar inversionista, tranche…" oninput="filterTable('tbl-capital',this.value)">
+        <span class="tbl-info" id="info-capital">— registros</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-capital">
+          <thead><tr>
+            <th onclick="sortTable('tbl-capital',0)">Inversionista</th>
+            <th onclick="sortTable('tbl-capital',1)">Instrumento</th>
+            <th onclick="sortTable('tbl-capital',2)">Tranche</th>
+            <th onclick="sortTable('tbl-capital',3)">Fecha Aporte</th>
+            <th onclick="sortTable('tbl-capital',4)" class="num">Monto Aportado</th>
+            <th onclick="sortTable('tbl-capital',5)" class="num">% Participación</th>
+            <th onclick="sortTable('tbl-capital',6)" class="num">Target (1.5×)</th>
+            <th onclick="sortTable('tbl-capital',7)">Timing</th>
+            <th onclick="sortTable('tbl-capital',8)">Status</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody id="tbody-capital"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: VENTAS -->
+    <div class="tab-panel" id="tab-ventas">
+      <div class="tab-summary cols-5" id="ts-ventas"></div>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" placeholder="Buscar unidad, comprador, status…" oninput="filterTable('tbl-ventas',this.value)">
+        <span class="tbl-info" id="info-ventas">— registros</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-ventas">
+          <thead><tr>
+            <th onclick="sortTable('tbl-ventas',0)">Unidad</th>
+            <th onclick="sortTable('tbl-ventas',1)">Tipo</th>
+            <th onclick="sortTable('tbl-ventas',2)" class="num">M²</th>
+            <th onclick="sortTable('tbl-ventas',3)">Comprador</th>
+            <th onclick="sortTable('tbl-ventas',4)">Vendedor</th>
+            <th onclick="sortTable('tbl-ventas',5)" class="num">Precio Lista</th>
+            <th onclick="sortTable('tbl-ventas',6)" class="num">Enganche (30%)</th>
+            <th onclick="sortTable('tbl-ventas',7)" class="num">Diferido (20%)</th>
+            <th onclick="sortTable('tbl-ventas',8)" class="num">Residual (50%)</th>
+            <th onclick="sortTable('tbl-ventas',9)">Forma Pago</th>
+            <th onclick="sortTable('tbl-ventas',10)">Status</th>
+            <th onclick="sortTable('tbl-ventas',11)">Fecha Firma</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody id="tbody-ventas"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: COBRANZA -->
+    <div class="tab-panel" id="tab-cobranza">
+      <div class="tab-summary cols-4" id="ts-cobranza"></div>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" placeholder="Buscar comprador, unidad, banco…" oninput="filterTable('tbl-cobranza',this.value)">
+        <span class="tbl-info" id="info-cobranza">— registros</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-cobranza">
+          <thead><tr>
+            <th onclick="sortTable('tbl-cobranza',0)">Mes</th>
+            <th onclick="sortTable('tbl-cobranza',1)">Unidad</th>
+            <th onclick="sortTable('tbl-cobranza',2)">Comprador</th>
+            <th onclick="sortTable('tbl-cobranza',3)">Tipo Pago</th>
+            <th onclick="sortTable('tbl-cobranza',4)" class="num">Monto</th>
+            <th onclick="sortTable('tbl-cobranza',5)">Fecha Pago</th>
+            <th onclick="sortTable('tbl-cobranza',6)">Banco</th>
+            <th onclick="sortTable('tbl-cobranza',7)">Referencia</th>
+            <th onclick="sortTable('tbl-cobranza',8)">Status</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody id="tbody-cobranza"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: GASTOS -->
+    <div class="tab-panel" id="tab-gastos">
+      <div class="tab-summary cols-5" id="ts-gastos"></div>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" placeholder="Buscar concepto, proveedor, categoría…" oninput="filterTable('tbl-gastos',this.value)">
+        <span class="tbl-info" id="info-gastos">— registros</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-gastos">
+          <thead><tr>
+            <th onclick="sortTable('tbl-gastos',0)">Mes</th>
+            <th onclick="sortTable('tbl-gastos',1)">Categoría</th>
+            <th onclick="sortTable('tbl-gastos',2)">Concepto</th>
+            <th onclick="sortTable('tbl-gastos',3)" class="num">Presupuestado</th>
+            <th onclick="sortTable('tbl-gastos',4)" class="num">Pagado</th>
+            <th onclick="sortTable('tbl-gastos',5)" class="num">Varianza</th>
+            <th onclick="sortTable('tbl-gastos',6)">Proveedor</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody id="tbody-gastos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: PRESUPUESTO -->
+    <div class="tab-panel" id="tab-presupuesto">
+      <div class="tab-summary cols-4" id="ts-presupuesto"></div>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" placeholder="Buscar concepto, categoría…" oninput="filterTable('tbl-presupuesto',this.value)">
+        <span class="tbl-info" id="info-presupuesto">— registros</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-presupuesto">
+          <thead><tr>
+            <th onclick="sortTable('tbl-presupuesto',0)">Mes</th>
+            <th onclick="sortTable('tbl-presupuesto',1)">Categoría</th>
+            <th onclick="sortTable('tbl-presupuesto',2)">Concepto</th>
+            <th onclick="sortTable('tbl-presupuesto',3)" class="num">Monto</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody id="tbody-presupuesto"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: OBRA -->
+    <div class="tab-panel" id="tab-obra">
+      <div class="tab-summary cols-4" id="ts-obra"></div>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" placeholder="Buscar actividad, mes…" oninput="filterTable('tbl-obra',this.value)">
+        <span class="tbl-info" id="info-obra">— registros</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-obra">
+          <thead><tr>
+            <th onclick="sortTable('tbl-obra',0)">Mes</th>
+            <th onclick="sortTable('tbl-obra',1)">Período</th>
+            <th onclick="sortTable('tbl-obra',2)">Actividad</th>
+            <th onclick="sortTable('tbl-obra',3)" class="num">Avance Real %</th>
+            <th onclick="sortTable('tbl-obra',4)" class="num">Objetivo %</th>
+            <th onclick="sortTable('tbl-obra',5)" class="num">Delta</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody id="tbody-obra"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: HITOS -->
+    <div class="tab-panel" id="tab-hitos">
+      <div class="tab-summary cols-3" id="ts-hitos"></div>
+      <div class="tbl-toolbar">
+        <input class="tbl-search" placeholder="Buscar hito, status…" oninput="filterTable('tbl-hitos',this.value)">
+        <span class="tbl-info" id="info-hitos">— registros</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-hitos">
+          <thead><tr>
+            <th onclick="sortTable('tbl-hitos',0)">Mes</th>
+            <th onclick="sortTable('tbl-hitos',1)">Hito</th>
+            <th onclick="sortTable('tbl-hitos',2)">Status</th>
+            <th onclick="sortTable('tbl-hitos',3)">Fecha Objetivo</th>
+            <th onclick="sortTable('tbl-hitos',4)">Fecha Real</th>
+            <th>Notas</th>
+          </tr></thead>
+          <tbody id="tbody-hitos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB: DEUDA -->
+    <div class="tab-panel" id="tab-deuda">
+      <div class="tab-summary cols-3" id="ts-deuda">
+        <div class="ts-cell"><div class="ts-label">Estructura</div><div class="ts-value accent">100% Equity</div><div class="ts-sub">Sin deuda bancaria</div></div>
+        <div class="ts-cell"><div class="ts-label">Deuda Total</div><div class="ts-value">$0</div><div class="ts-sub">Proyecto sin apalancamiento</div></div>
+        <div class="ts-cell"><div class="ts-label">LTV</div><div class="ts-value">0.0%</div><div class="ts-sub">N/A — 100% equity</div></div>
+      </div>
+      <div class="tbl-empty">Mártires 122 es un proyecto 100% equity — sin deuda bancaria.<br>Esta sección se habilitará si se contrata financiamiento en el futuro.</div>
+    </div>
+
+  </div><!-- /drill-section -->
+
+</div><!-- /content -->
+
+<!-- FOOTER -->
+<div class="footer">
+  <span class="footer-text">KORA AM — Plataforma Interna · Confidencial</span>
+  <span class="footer-text" id="footer-src">—</span>
+</div>
+
+<!-- DETAIL DRAWER -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer(event)">
+  <div class="drawer" id="drawer">
+    <div class="drawer-header">
+      <span class="drawer-title" id="drawer-title">Detalle</span>
+      <button class="drawer-close" onclick="closeDrawer(null)">×</button>
+    </div>
+    <div class="drawer-body" id="drawer-body"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// FORMATTERS
+// ─────────────────────────────────────────────────────────────
+const fmtM = v => {
+  if (v == null || v === '' || v === 0 && typeof v !== 'number') return '—';
+  const a = Math.abs(+v), s = +v < 0 ? '-' : '';
+  if (a >= 1e6) return s + '$' + (a/1e6).toFixed(2).replace(/\.?0+$/, '') + 'M';
+  if (a >= 1e3) return s + '$' + Math.round(a).toLocaleString('es-MX');
+  return s + '$' + (+v).toLocaleString('es-MX');
+};
+const fmtMFull = v => {
+  if (!v && v !== 0) return '—';
+  return '$' + (+v).toLocaleString('es-MX', {minimumFractionDigits:0, maximumFractionDigits:0});
+};
+const fmtP   = v => (v||0).toFixed(1) + '%';
+const fmtPct = v => (+v||0).toFixed(1) + '%';
+const clamp  = (v, lo=0, hi=100) => Math.min(hi, Math.max(lo, +v||0));
+const safe   = v => (v == null || v === '') ? '—' : String(v);
+
+function badge(status) {
+  if (!status) return '';
+  const s = String(status).toLowerCase().trim().replace(/\s+/g, '-');
+  const map = {
+    'recibido':'recibido','firmado':'firmado','completado':'completado',
+    'en-proceso':'en-proceso','pendiente':'pendiente','vencido':'vencido',
+    'cancelado':'cancelado','pagado':'pagado',
+  };
+  const cls = map[s] || 'default';
+  return `<span class="badge ${cls}">${status}</span>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// CHART SETUP
+// ─────────────────────────────────────────────────────────────
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size   = 11;
+Chart.defaults.color       = '#8a7b66';
+
+const TERRA   = '#926031';
+const BRONZE  = '#8a7b66';
+const GREEN   = '#4a7c5a';
+const ALABASTER = '#ede5db';
+const GRAPHITE  = '#2b2b2b';
+
+let charts = {};
+
+function initCharts() {
+  const gridColor = '#ede5db';
+  const scaleOpts = {
+    x: { grid:{color:gridColor,drawBorder:false}, ticks:{color:BRONZE,maxTicksLimit:9,font:{size:10}} },
+    y: { grid:{color:gridColor,drawBorder:false}, ticks:{color:BRONZE,font:{size:10}, callback:v=>'$'+v.toFixed(0)+'M'} }
+  };
+
+  charts.cf = new Chart(document.getElementById('chart-cf'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label:'Proforma', data:[], borderColor:GRAPHITE, borderWidth:1.5, backgroundColor:'rgba(43,43,43,0.04)', tension:0.3, fill:true, pointRadius:0 },
+      { label:'Real',     data:[], borderColor:TERRA,    borderWidth:2,   backgroundColor:'rgba(146,96,49,0.06)', tension:0.3, fill:true, pointRadius:3, pointBackgroundColor:TERRA },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{usePointStyle:true,pointStyle:'circle'}}}, scales:scaleOpts }
+  });
+
+  charts.ventas = new Chart(document.getElementById('chart-ventas'), {
+    type: 'bar',
+    data: { labels: [], datasets: [
+      { label:'Rev. Firmado', data:[], backgroundColor:TERRA+'cc', borderColor:TERRA, borderWidth:0 },
+      { label:'Cobrado',      data:[], backgroundColor:BRONZE+'99', borderColor:BRONZE, borderWidth:0 },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{labels:{usePointStyle:true,pointStyle:'rect'}}},
+      scales:{...scaleOpts, y:{...scaleOpts.y, ticks:{...scaleOpts.y.ticks, callback:v=>'$'+v.toFixed(1)+'M'}}} }
+  });
+
+  charts.costos = new Chart(document.getElementById('chart-costos'), {
+    type: 'doughnut',
+    data: { labels:['Tierra','Construcción','Acabados','Legal/Notarial','Otros'],
+      datasets:[{data:[9040000,47752578,7200000,1300000,8870932],
+        backgroundColor:[GRAPHITE,TERRA,BRONZE,'#b8a898','#d5cfc7'], borderColor:'#ffffff', borderWidth:3}] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{legend:{position:'right',labels:{font:{size:10},padding:12,usePointStyle:true,pointStyle:'rect'}},
+        tooltip:{callbacks:{label:c=>' '+c.label+': $'+(c.raw/1e6).toFixed(1)+'M'}}}}
+  });
+
+  charts.cobType = new Chart(document.getElementById('chart-cob-type'), {
+    type: 'doughnut',
+    data: { labels:['Enganche (30%)','Diferido (20%)','Residual (50%)'],
+      datasets:[{data:[28980000,19320000,48300000], backgroundColor:[TERRA,BRONZE,'#b8a898'], borderColor:'#ffffff', borderWidth:3}] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{legend:{position:'right',labels:{font:{size:10},padding:12,usePointStyle:true,pointStyle:'rect'}},
+        tooltip:{callbacks:{label:c=>' '+c.label+': $'+(c.raw/1e6).toFixed(1)+'M'}}}}
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// SUMMARY KPIs
+// ─────────────────────────────────────────────────────────────
+function updateSummary(d) {
+  const k = d.kpis, m = d.meta;
+
+  document.getElementById('topbar-time').textContent  = new Date(m.updated_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('source-label').textContent = m.source.toUpperCase();
+  document.getElementById('updated-label').textContent= new Date(m.updated_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('footer-src').textContent   = `PRY-002 · ${m.source.toUpperCase()} · Auto-refresh 60s`;
+
+  document.getElementById('mes-num').textContent   = `M${m.mes_actual}`;
+  document.getElementById('mes-label').textContent = m.label_actual.toUpperCase();
+  const pctT = ((m.mes_actual/36)*100).toFixed(1);
+  document.getElementById('mes-pct').textContent   = fmtP(parseFloat(pctT));
+  document.getElementById('mes-bar').style.width   = clamp(pctT) + '%';
+
+  document.getElementById('kv-rev-pf').textContent   = fmtM(k.revenue_proforma);
+  document.getElementById('kv-rev-firm').textContent  = fmtM(k.revenue_firmado);
+  document.getElementById('ks-rev-firm').textContent  = `de ${fmtM(k.revenue_proforma)} proforma`;
+  document.getElementById('kb-rev').style.width       = clamp(k.pct_revenue_firmado) + '%';
+  document.getElementById('kp-rev').textContent       = fmtP(k.pct_revenue_firmado) + ' firmado';
+
+  document.getElementById('kv-cob').textContent   = fmtM(k.cobranza_total);
+  const pctCob = k.revenue_firmado > 0 ? (k.cobranza_total/k.revenue_firmado*100) : 0;
+  document.getElementById('kb-cob').style.width   = clamp(pctCob) + '%';
+  document.getElementById('kp-cob').textContent   = fmtP(pctCob) + ' del firmado';
+
+  document.getElementById('kv-cost').textContent  = fmtM(k.costo_ejecutado);
+  document.getElementById('ks-cost').textContent  = `de ${fmtM(k.ppto_proforma)} presupuesto`;
+  document.getElementById('kb-cost').style.width  = clamp(k.pct_presupuesto_ejecutado) + '%';
+  document.getElementById('kp-cost').textContent  = fmtP(k.pct_presupuesto_ejecutado) + ' ejecutado';
+
+  document.getElementById('kv-margin').textContent  = fmtM(k.margen_bruto_proforma);
+  const pctMrg = k.revenue_proforma > 0 ? (k.margen_bruto_proforma/k.revenue_proforma*100).toFixed(1) : 0;
+  document.getElementById('ks-margin').textContent  = `${pctMrg}% del revenue`;
+
+  document.getElementById('kv-units').textContent   = `${k.unidades_firmadas} / ${k.total_units}`;
+  document.getElementById('ks-units').textContent   = `de ${k.total_units} disponibles`;
+  document.getElementById('kb-units').style.width   = clamp(k.pct_absorcion) + '%';
+  document.getElementById('kp-units').textContent   = fmtP(k.pct_absorcion) + ' absorción';
+
+  document.getElementById('kv-lp').textContent       = fmtM(k.lp_equity);
+  const pctLp = k.lp_equity > 0 ? (k.lp_equity_recibido/k.lp_equity*100) : 0;
+  document.getElementById('ks-lp').textContent       = `${fmtM(k.lp_equity_recibido)} recibido`;
+  document.getElementById('kb-lp').style.width       = clamp(pctLp) + '%';
+  document.getElementById('kp-lp').textContent       = fmtP(pctLp) + ' recibido';
+
+  document.getElementById('kv-lp-target').textContent = fmtM(k.lp_payout_target);
+  document.getElementById('ks-lp-target').textContent = `${k.lp_multiple}× múltiplo`;
+  document.getElementById('kv-gp').textContent        = fmtM(k.gp_promote_est);
+  document.getElementById('kv-multiple').textContent  = `${k.lp_multiple}×`;
+
+  // Charts
+  const cf = d.cashflow;
+  let realAcum = [], cum = 0;
+  for (const r of d.by_month) { cum += (r.cobrado_total - r.costo_ejecutado)/1e6; realAcum.push(parseFloat(cum.toFixed(2))); }
+  const step = 3;
+  charts.cf.data.labels           = cf.labels.filter((_,i)=>i%step===0);
+  charts.cf.data.datasets[0].data = cf.proforma.filter((_,i)=>i%step===0);
+  charts.cf.data.datasets[1].data = realAcum.filter((_,i)=>i%step===0);
+  charts.cf.update();
+
+  const bm = d.by_month.filter(r=>r.ventas_firmadas>0||r.cobrado_total>0||r.revenue_firmado>0);
+  charts.ventas.data.labels           = bm.map(r=>r.label);
+  charts.ventas.data.datasets[0].data = bm.map(r=>r.revenue_firmado/1e6);
+  charts.ventas.data.datasets[1].data = bm.map(r=>r.cobrado_total/1e6);
+  charts.ventas.update();
+
+  // Waterfall
+  const wfEl = document.getElementById('wf-container');
+  const barCls = {A:'',B:'b',C:'c'};
+  wfEl.innerHTML = d.waterfall.map(w=>{
+    const pct = clamp(w.pct_completado);
+    return `<div class="wf-item">
+      <div class="wf-header"><span class="wf-tranche">Tranche ${w.tranche}</span><span style="font-size:10px;color:var(--muted)">${fmtP(pct)}</span></div>
+      <div class="wf-amounts">
+        <span class="wf-amount">Aportado: <b>${fmtM(w.capital_aportado)}</b></span>
+        <span class="wf-amount">Target: <b>${fmtM(w.target_payout)}</b></span>
+        <span class="wf-amount">Pendiente: <b>${fmtM(w.pendiente_pagar)}</b></span>
+      </div>
+      <div class="wf-bar-track"><div class="wf-bar-fill ${barCls[w.tranche]||''}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+  document.getElementById('wf-target').textContent = fmtM(k.lp_payout_target);
+  document.getElementById('wf-gp').textContent     = fmtM(k.gp_promote_est);
+
+  // Avance
+  document.getElementById('avance-container').innerHTML = (d.avance||[]).map(a=>{
+    const pf = clamp(a.pct_objetivo), real = clamp(a.pct_avance);
+    const col = real >= pf ? 'var(--success)' : 'var(--terra)';
+    return `<div class="avance-row">
+      <span class="avance-label">${a.label}</span>
+      <div class="avance-track"><div class="avance-obj" style="width:${pf}%"></div><div class="avance-real" style="width:${real}%"></div></div>
+      <span class="avance-pct" style="color:${col}">${real}%</span>
+    </div>`;
+  }).join('');
+
+  // Hitos
+  document.getElementById('hitos-container').innerHTML = (d.hitos||[]).map(h=>{
+    const done = (h.status||'').toLowerCase()==='completado';
+    return `<div class="hito">
+      <div class="hito-icon ${done?'done':'pending'}"></div>
+      <div class="hito-text">${h.hito}</div>
+      <div class="hito-date">${h.fecha_objetivo||''}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// DRILL-DOWN TABLES
+// ─────────────────────────────────────────────────────────────
+
+function summaryHTML(cells) {
+  return cells.map(c=>`<div class="ts-cell">
+    <div class="ts-label">${c.label}</div>
+    <div class="ts-value ${c.cls||''}">${c.value}</div>
+    ${c.sub ? `<div class="ts-sub">${c.sub}</div>` : ''}
+  </div>`).join('');
+}
+
+function buildCapital(rows) {
+  document.getElementById('cnt-capital').textContent = rows.length;
+  const total = rows.reduce((s,r)=>s+(+r.monto||0),0);
+  const target = rows.reduce((s,r)=>s+(+r.target_payout||0),0);
+  const recibido = rows.filter(r=>r.status?.toLowerCase()==='recibido').reduce((s,r)=>s+(+r.monto||0),0);
+  document.getElementById('ts-capital').innerHTML = summaryHTML([
+    {label:'Total Aportado',    value:fmtM(total),    cls:'accent', sub:'LP equity'},
+    {label:'Target Payout 1.5×',value:fmtM(target),               sub:'Obligación total'},
+    {label:'Capital Recibido',  value:fmtM(recibido), cls:'success',sub:rows.length+' tranches'},
+    {label:'Rendimiento LP',    value:fmtM(target-total),          sub:'Yield objetivo'},
+  ]);
+  const tbody = document.getElementById('tbody-capital');
+  tbody.innerHTML = rows.map((r,i)=>`<tr onclick="openDrawer('capital',${i})" data-search="${[r.inversionista,r.instrumento,r.tranche,r.fecha,r.status,r.notas].join(' ').toLowerCase()}">
+    <td class="bold">${safe(r.inversionista)}</td>
+    <td>${safe(r.instrumento)}</td>
+    <td class="terra">Tranche ${safe(r.tranche)}</td>
+    <td>${safe(r.fecha)}</td>
+    <td class="num terra">${fmtMFull(r.monto)}</td>
+    <td class="num">${r.porcentaje_participacion ? fmtPct(r.porcentaje_participacion) : '—'}</td>
+    <td class="num">${fmtMFull(r.target_payout)}</td>
+    <td class="muted">${safe(r.timing)}</td>
+    <td>${badge(r.status)}</td>
+    <td class="muted">${safe(r.notas)}</td>
+  </tr>`).join('');
+  document.getElementById('info-capital').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+}
+
+function buildVentas(rows) {
+  document.getElementById('cnt-ventas').textContent = rows.length;
+  const firmadas  = rows.filter(r=>r.status?.toLowerCase()==='firmado');
+  const revFirm   = firmadas.reduce((s,r)=>s+(+r.precio_lista||0),0);
+  const pendientes= rows.filter(r=>r.status?.toLowerCase()==='en proceso'||r.status?.toLowerCase()==='en-proceso');
+  const ticketProm= firmadas.length ? revFirm/firmadas.length : 0;
+  document.getElementById('ts-ventas').innerHTML = summaryHTML([
+    {label:'Unidades Firmadas', value:`${firmadas.length}/${rows.length}`, cls:'accent', sub:fmtPct(firmadas.length/(rows.length||1)*100)+' absorción'},
+    {label:'Revenue Firmado',   value:fmtM(revFirm),       cls:'success',sub:'vs $96.6M proforma'},
+    {label:'Ticket Promedio',   value:fmtM(ticketProm),                  sub:'por unidad firmada'},
+    {label:'En Proceso',        value:pendientes.length,                 sub:'unidades en negociación'},
+    {label:'Disponibles',       value:15-rows.length,                    sub:'unidades sin operación'},
+  ]);
+  const tbody = document.getElementById('tbody-ventas');
+  tbody.innerHTML = rows.map((r,i)=>`<tr onclick="openDrawer('ventas',${i})" data-search="${[r.unidad_id,r.tipo,r.comprador,r.vendedor,r.forma_pago,r.status].join(' ').toLowerCase()}">
+    <td class="bold terra">${safe(r.unidad_id)}</td>
+    <td>${safe(r.tipo)}</td>
+    <td class="num">${safe(r.m2)} m²</td>
+    <td class="bold">${safe(r.comprador)}</td>
+    <td class="muted">${safe(r.vendedor)}</td>
+    <td class="num terra">${fmtMFull(r.precio_lista)}</td>
+    <td class="num">${fmtMFull(r.enganche)}</td>
+    <td class="num">${fmtMFull(r.diferido)}</td>
+    <td class="num">${fmtMFull(r.residual)}</td>
+    <td class="muted">${safe(r.forma_pago)}</td>
+    <td>${badge(r.status)}</td>
+    <td>${safe(r.fecha_firma)}</td>
+    <td class="muted">${safe(r.notas)}</td>
+  </tr>`).join('');
+  document.getElementById('info-ventas').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+}
+
+function buildCobranza(rows) {
+  document.getElementById('cnt-cobranza').textContent = rows.length;
+  const total    = rows.reduce((s,r)=>s+(+r.monto||0),0);
+  const enganches= rows.filter(r=>r.tipo_pago?.toLowerCase()==='enganche').reduce((s,r)=>s+(+r.monto||0),0);
+  const diferidos= rows.filter(r=>r.tipo_pago?.toLowerCase()==='diferido').reduce((s,r)=>s+(+r.monto||0),0);
+  document.getElementById('ts-cobranza').innerHTML = summaryHTML([
+    {label:'Total Cobrado',  value:fmtM(total),     cls:'success',sub:rows.length+' pagos registrados'},
+    {label:'Enganches',      value:fmtM(enganches),               sub:'30% del precio lista'},
+    {label:'Diferidos',      value:fmtM(diferidos),               sub:'15 mensualidades'},
+    {label:'Residuales',     value:fmtM(total-enganches-diferidos),sub:'50% en escrituración'},
+  ]);
+  const tbody = document.getElementById('tbody-cobranza');
+  tbody.innerHTML = rows.map((r,i)=>`<tr onclick="openDrawer('cobranza',${i})" data-search="${[r.comprador,r.unidad_id,r.tipo_pago,r.banco,r.referencia,r.status].join(' ').toLowerCase()}">
+    <td class="muted">M${safe(r.mes)}</td>
+    <td class="bold terra">${safe(r.unidad_id)}</td>
+    <td class="bold">${safe(r.comprador)}</td>
+    <td>${safe(r.tipo_pago)}</td>
+    <td class="num terra">${fmtMFull(r.monto)}</td>
+    <td>${safe(r.fecha_pago)}</td>
+    <td class="muted">${safe(r.banco)}</td>
+    <td class="muted" style="font-family:var(--font-mono);font-size:10px">${safe(r.referencia)}</td>
+    <td>${badge(r.status)}</td>
+    <td class="muted">${safe(r.notas)}</td>
+  </tr>`).join('');
+  document.getElementById('info-cobranza').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+}
+
+function buildGastos(rows) {
+  document.getElementById('cnt-gastos').textContent = rows.length;
+  const presup = rows.reduce((s,r)=>s+(+r.presupuestado||0),0);
+  const pagado = rows.reduce((s,r)=>s+(+r.pagado||0),0);
+  const varAbs = pagado - presup;
+  const varPct = presup ? (varAbs/presup*100) : 0;
+  document.getElementById('ts-gastos').innerHTML = summaryHTML([
+    {label:'Presupuestado',    value:fmtM(presup),  sub:rows.length+' líneas'},
+    {label:'Pagado',           value:fmtM(pagado),  cls:'accent',sub:fmtPct(presup?pagado/presup*100:0)+' ejecutado'},
+    {label:'Varianza',         value:fmtM(varAbs),  cls:varAbs>0?'':'success',sub:(varAbs>0?'Sobre':'Bajo')+' presupuesto'},
+    {label:'% Varianza',       value:fmtPct(Math.abs(varPct)), sub:varAbs>0?'Exceso':'Ahorro'},
+    {label:'Pago Completo',    value:rows.filter(r=>+r.pagado>0&&+r.pagado>=(+r.presupuestado||0)).length, sub:'líneas 100% pagadas'},
+  ]);
+  const tbody = document.getElementById('tbody-gastos');
+  tbody.innerHTML = rows.map((r,i)=>{
+    const v = (+r.pagado||0) - (+r.presupuestado||0);
+    const vHTML = v===0 ? '<span style="color:var(--muted)">—</span>'
+                : v>0   ? `<span class="var-neg">+${fmtMFull(v)}</span>`
+                        : `<span class="var-pos">${fmtMFull(v)}</span>`;
+    return `<tr onclick="openDrawer('gastos',${i})" data-search="${[r.categoria,r.concepto,r.proveedor].join(' ').toLowerCase()}">
+      <td class="muted">M${safe(r.mes)}</td>
+      <td><span style="font-family:var(--font-head);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--bronze)">${safe(r.categoria)}</span></td>
+      <td class="bold">${safe(r.concepto)}</td>
+      <td class="num">${fmtMFull(r.presupuestado)}</td>
+      <td class="num terra">${fmtMFull(r.pagado)}</td>
+      <td class="num">${vHTML}</td>
+      <td class="muted">${safe(r.proveedor)}</td>
+      <td class="muted">${safe(r.notas)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('info-gastos').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+}
+
+function buildPresupuesto(rows) {
+  document.getElementById('cnt-presupuesto').textContent = rows.length;
+  const total = rows.reduce((s,r)=>s+(+r.presupuestado||0),0);
+  const cats  = {};
+  rows.forEach(r=>{ const c=r.categoria||'Otros'; cats[c]=(cats[c]||0)+(+r.presupuestado||0); });
+  const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0] || ['—',0];
+  document.getElementById('ts-presupuesto').innerHTML = summaryHTML([
+    {label:'Total Presupuestado', value:fmtM(total), cls:'accent', sub:rows.length+' líneas'},
+    {label:'Categorías',          value:Object.keys(cats).length, sub:'conceptos agrupados'},
+    {label:'Mayor Rubro',         value:topCat[0],   sub:fmtM(topCat[1])+' · '+fmtPct(total?topCat[1]/total*100:0)},
+    {label:'Prom. por Línea',     value:fmtM(rows.length?total/rows.length:0), sub:'por concepto'},
+  ]);
+  const tbody = document.getElementById('tbody-presupuesto');
+  let lastCat = '';
+  tbody.innerHTML = rows.map((r,i)=>{
+    const isNewCat = r.categoria !== lastCat;
+    lastCat = r.categoria;
+    return `<tr onclick="openDrawer('presupuesto',${i})" data-search="${[r.categoria,r.concepto].join(' ').toLowerCase()}" ${isNewCat?'style="border-top:2px solid var(--border)"':''}>
+      <td class="muted">M${safe(r.mes)}</td>
+      <td><span style="font-family:var(--font-head);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--bronze)">${safe(r.categoria)}</span></td>
+      <td class="bold">${safe(r.concepto)}</td>
+      <td class="num terra">${fmtMFull(r.presupuestado)}</td>
+      <td class="muted">${safe(r.notas)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('info-presupuesto').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+}
+
+function buildObra(rows) {
+  document.getElementById('cnt-obra').textContent = rows.length;
+  const last   = rows[rows.length-1] || {};
+  const avActual = +(last.pct_avance||0);
+  const avObj    = +(last.pct_objetivo||0);
+  const onTrack  = rows.filter(r=>+r.pct_avance>=+r.pct_objetivo).length;
+  document.getElementById('ts-obra').innerHTML = summaryHTML([
+    {label:'Avance Actual',   value:fmtPct(avActual), cls:'accent', sub:last.actividad||'—'},
+    {label:'Objetivo Actual', value:fmtPct(avObj),                  sub:'según cronograma'},
+    {label:'En Tiempo',       value:`${onTrack}/${rows.length}`,     sub:'meses on-track'},
+    {label:'Delta',           value:(avActual-avObj>=0?'+':'')+fmtPct(avActual-avObj), cls:avActual>=avObj?'success':'', sub:'real vs objetivo'},
+  ]);
+  const tbody = document.getElementById('tbody-obra');
+  tbody.innerHTML = rows.map((r,i)=>{
+    const delta = +r.pct_avance - +r.pct_objetivo;
+    const dHTML = delta===0 ? '<span style="color:var(--muted)">0%</span>'
+                : delta>0   ? `<span class="var-pos">+${delta.toFixed(1)}%</span>`
+                            : `<span class="var-neg">${delta.toFixed(1)}%</span>`;
+    return `<tr onclick="openDrawer('obra',${i})" data-search="${[r.label,r.actividad,r.notas].join(' ').toLowerCase()}">
+      <td class="muted">M${safe(r.mes)}</td>
+      <td class="bold">${safe(r.label)}</td>
+      <td>${safe(r.actividad)}</td>
+      <td class="num terra">${safe(r.pct_avance)}%</td>
+      <td class="num muted">${safe(r.pct_objetivo)}%</td>
+      <td class="num">${dHTML}</td>
+      <td class="muted">${safe(r.notas)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('info-obra').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+}
+
+function buildHitos(rows) {
+  document.getElementById('cnt-hitos').textContent = rows.length;
+  const done = rows.filter(r=>r.status?.toLowerCase()==='completado').length;
+  const pend = rows.filter(r=>r.status?.toLowerCase()==='pendiente').length;
+  document.getElementById('ts-hitos').innerHTML = summaryHTML([
+    {label:'Completados', value:done, cls:'success', sub:`de ${rows.length} total`},
+    {label:'Pendientes',  value:pend,                sub:'por completar'},
+    {label:'% Avance',    value:fmtPct(rows.length?done/rows.length*100:0), sub:'milestones alcanzados'},
+  ]);
+  const tbody = document.getElementById('tbody-hitos');
+  tbody.innerHTML = rows.map((r,i)=>`<tr onclick="openDrawer('hitos',${i})" data-search="${[r.hito,r.status].join(' ').toLowerCase()}">
+    <td class="muted">M${safe(r.mes)}</td>
+    <td class="bold">${safe(r.hito)}</td>
+    <td>${badge(r.status)}</td>
+    <td>${safe(r.fecha_objetivo)}</td>
+    <td class="${r.fecha_real?'success-text':'muted'}">${safe(r.fecha_real) || '—'}</td>
+    <td class="muted">${safe(r.notas)}</td>
+  </tr>`).join('');
+  document.getElementById('info-hitos').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// TAB SYSTEM
+// ─────────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.toggle('active', p.id==='tab-'+id));
+}
+
+function gotoTab(id) {
+  switchTab(id);
+  document.getElementById('tab-nav').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ─────────────────────────────────────────────────────────────
+// TABLE SORT & FILTER
+// ─────────────────────────────────────────────────────────────
+const sortState = {};
+
+function sortTable(tblId, col) {
+  const tbl  = document.getElementById(tblId);
+  const tbody= tbl.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const key  = tblId+':'+col;
+  const asc  = sortState[key] !== 'asc';
+  sortState[key] = asc ? 'asc' : 'desc';
+
+  // Update header indicators
+  tbl.querySelectorAll('th').forEach((th,i)=>{
+    th.classList.remove('sorted-asc','sorted-desc');
+    if (i===col) th.classList.add(asc?'sorted-asc':'sorted-desc');
+  });
+
+  rows.sort((a,b)=>{
+    const av = a.cells[col]?.textContent.trim().replace(/[$,M%↑↓+]/g,'') || '';
+    const bv = b.cells[col]?.textContent.trim().replace(/[$,M%↑↓+]/g,'') || '';
+    const an = parseFloat(av), bn = parseFloat(bv);
+    if (!isNaN(an) && !isNaN(bn)) return asc ? an-bn : bn-an;
+    return asc ? av.localeCompare(bv,'es') : bv.localeCompare(av,'es');
+  });
+  rows.forEach(r=>tbody.appendChild(r));
+}
+
+function filterTable(tblId, query) {
+  const q = query.toLowerCase().trim();
+  const tbody = document.getElementById(tblId).querySelector('tbody');
+  let visible = 0;
+  tbody.querySelectorAll('tr').forEach(r=>{
+    const match = !q || (r.dataset.search||'').includes(q) || r.textContent.toLowerCase().includes(q);
+    r.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  // Update info label
+  const infoId = 'info-' + tblId.replace('tbl-','');
+  const el = document.getElementById(infoId);
+  if (el) el.textContent = q ? `${visible} resultado${visible!==1?'s':''} de ${tbody.querySelectorAll('tr').length}` : `${tbody.querySelectorAll('tr').length} registro${tbody.querySelectorAll('tr').length!==1?'s':''}`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// DETAIL DRAWER
+// ─────────────────────────────────────────────────────────────
+let _detailData = {};
+
+function openDrawer(module, idx) {
+  const row    = _detailData[module]?.[idx];
+  if (!row) return;
+  const overlay = document.getElementById('drawer-overlay');
+  const title   = document.getElementById('drawer-title');
+  const body    = document.getElementById('drawer-body');
+
+  const titles = {
+    capital:'Capital LP — Detalle',ventas:'Venta — Detalle',
+    cobranza:'Cobro — Detalle',gastos:'Gasto — Detalle',
+    presupuesto:'Presupuesto — Detalle',obra:'Avance Obra — Detalle',
+    hitos:'Hito — Detalle',
+  };
+  title.textContent = titles[module] || 'Detalle';
+
+  // Build sections from row keys
+  const sectionMap = {
+    capital: [
+      {title:'Inversionista', keys:['inversionista','instrumento','tranche','porcentaje_participacion']},
+      {title:'Capital',       keys:['monto','target_payout','timing','fecha']},
+      {title:'Estado',        keys:['status','notas']},
+    ],
+    ventas: [
+      {title:'Unidad',        keys:['unidad_id','tipo','m2']},
+      {title:'Comprador',     keys:['comprador','vendedor','forma_pago','fecha_firma']},
+      {title:'Financiero',    keys:['precio_lista','enganche','diferido','residual']},
+      {title:'Estado',        keys:['status','notas']},
+    ],
+    cobranza: [
+      {title:'Pago',          keys:['tipo_pago','monto','fecha_pago']},
+      {title:'Comprador',     keys:['comprador','unidad_id']},
+      {title:'Banco',         keys:['banco','referencia','status']},
+      {title:'Notas',         keys:['notas']},
+    ],
+    gastos: [
+      {title:'Identificación',keys:['mes','categoria','concepto']},
+      {title:'Financiero',    keys:['presupuestado','pagado']},
+      {title:'Proveedor',     keys:['proveedor','notas']},
+    ],
+    presupuesto: [
+      {title:'Identificación',keys:['mes','categoria','concepto']},
+      {title:'Monto',         keys:['presupuestado']},
+      {title:'Notas',         keys:['notas']},
+    ],
+    obra: [
+      {title:'Período',       keys:['mes','label','actividad']},
+      {title:'Avance',        keys:['pct_avance','pct_objetivo']},
+      {title:'Notas',         keys:['notas']},
+    ],
+    hitos: [
+      {title:'Hito',          keys:['mes','hito','status']},
+      {title:'Fechas',        keys:['fecha_objetivo','fecha_real']},
+      {title:'Notas',         keys:['notas']},
+    ],
+  };
+
+  const moneyKeys   = ['monto','precio_lista','enganche','diferido','residual','target_payout','presupuestado','pagado'];
+  const pctKeys     = ['pct_avance','pct_objetivo','porcentaje_participacion'];
+  const badgeKeys   = ['status'];
+  const labelMap = {
+    inversionista:'Inversionista',instrumento:'Instrumento',tranche:'Tranche',
+    porcentaje_participacion:'% Participación',monto:'Monto',target_payout:'Target Payout (1.5×)',
+    timing:'Timing',fecha:'Fecha Aporte',status:'Status',notas:'Notas',
+    unidad_id:'Unidad',tipo:'Tipo',m2:'Superficie (m²)',comprador:'Comprador',
+    vendedor:'Asesor de Ventas',forma_pago:'Forma de Pago',fecha_firma:'Fecha Firma',
+    precio_lista:'Precio Lista',enganche:'Enganche (30%)',diferido:'Diferido (20%)',
+    residual:'Residual (50%)',tipo_pago:'Tipo de Pago',fecha_pago:'Fecha de Pago',
+    banco:'Banco',referencia:'Referencia',mes:'Mes del Proyecto',categoria:'Categoría',
+    concepto:'Concepto',presupuestado:'Presupuestado',pagado:'Pagado',proveedor:'Proveedor',
+    label:'Período',actividad:'Actividad',pct_avance:'Avance Real',pct_objetivo:'Objetivo',
+    hito:'Hito',fecha_objetivo:'Fecha Objetivo',fecha_real:'Fecha Real',
+  };
+
+  const secs = sectionMap[module] || [{title:'Datos', keys:Object.keys(row)}];
+  body.innerHTML = secs.map(sec=>{
+    const fields = sec.keys.filter(k=>row[k]!==undefined).map(k=>{
+      let val = row[k];
+      if (moneyKeys.includes(k) && val!==''&&val!=null) val = fmtMFull(val);
+      else if (pctKeys.includes(k)) val = fmtPct(val);
+      else if (badgeKeys.includes(k)) val = badge(val);
+      else val = safe(val);
+      const isBig = moneyKeys.includes(k) && !['notas'].includes(k);
+      return `<div class="drawer-field">
+        <span class="drawer-key">${labelMap[k]||k}</span>
+        <span class="drawer-val ${isBig&&row[k]?'big mono':''}">${val}</span>
+      </div>`;
+    }).join('');
+    if (!fields) return '';
+    return `<div class="drawer-section"><div class="drawer-section-title">${sec.title}</div>${fields}</div>`;
+  }).join('');
+
+  overlay.classList.add('open');
+
+  // Highlight row
+  document.querySelectorAll('.data-table tr').forEach(r=>r.classList.remove('selected'));
+  const tbodyId = 'tbody-'+module;
+  const trs = document.querySelectorAll(`#${tbodyId} tr`);
+  if (trs[idx]) trs[idx].classList.add('selected');
+}
+
+function closeDrawer(event) {
+  if (event && event.target !== document.getElementById('drawer-overlay')) return;
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.querySelectorAll('.data-table tr').forEach(r=>r.classList.remove('selected'));
+}
+
+// ─────────────────────────────────────────────────────────────
+// DATA LOAD
+// ─────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    const r = await fetch('/api/data');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+
+    updateSummary(d);
+
+    // Store detail data for drawer
+    const det = d.detail || {};
+    _detailData = {
+      capital:     det.capital_calls || [],
+      ventas:      det.ventas        || [],
+      cobranza:    det.cobranza      || [],
+      gastos:      det.gastos        || [],
+      presupuesto: det.presupuesto   || [],
+      obra:        det.avance        || [],
+      hitos:       det.hitos         || [],
+      deuda:       det.deuda         || [],
+    };
+
+    // Build tables
+    buildCapital(_detailData.capital);
+    buildVentas(_detailData.ventas);
+    buildCobranza(_detailData.cobranza);
+    buildGastos(_detailData.gastos);
+    buildPresupuesto(_detailData.presupuesto);
+    buildObra(_detailData.obra);
+    buildHitos(_detailData.hitos);
+    document.getElementById('cnt-deuda').textContent = 0;
+
+    document.getElementById('loading').classList.add('hidden');
+  } catch(e) {
+    console.error('Error cargando datos:', e);
+  }
+}
+
+async function refresh() {
+  try { await fetch('/api/refresh', {method:'POST'}); } catch(e){}
+  await loadData();
+}
+
+// ─────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────
+initCharts();
+loadData();
+setInterval(loadData, 60000);
+</script>
+</body>
+</html>

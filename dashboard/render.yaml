@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: kora-am-dashboard
+    runtime: python
+    rootDir: dashboard
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn dashboard_server:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: DATA_SOURCE
+        value: sheets
+      - key: PRY002_SHEET_ID
+        sync: false          # se configura en el dashboard de Render (secreto)
+      - key: SA_JSON_B64
+        sync: false          # se configura en el dashboard de Render (secreto)
+      - key: PYTHON_VERSION
+        value: "3.11.0"
