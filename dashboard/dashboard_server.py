@@ -83,7 +83,7 @@ def parse_num(val, default=0.0):
             return default
         # Formato europeo con puntos como miles: '1.890.000' → 1890000
         # Formato con comas: '1,890,000' → 1890000
-        clean = val.replace('$', '').replace(' ', '')
+        clean = val.replace('$', '').replace('%', '').replace(' ', '')
         # Si tiene más de un punto, tratar los puntos como separadores de miles
         if clean.count('.') > 1:
             clean = clean.replace('.', '')
