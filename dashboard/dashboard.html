@@ -141,6 +141,11 @@ body {
 .wf-bar-fill.b { background: var(--bronze); }
 .wf-bar-fill.c { background: #b8a898; }
 
+/* ── TRANCHE GROUP ROWS ─────────────────────────────────────── */
+.tr-group-hdr td { background: var(--black); color: #fff; font-family: var(--font-head); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 8px 12px; pointer-events: none; }
+.tr-group-hdr td .tg-meta { font-family: var(--font-body); font-weight: 400; font-size: 11px; letter-spacing: 0; text-transform: none; color: #aaa; margin-left: 12px; }
+.tr-group-hdr td .tg-total { float: right; color: var(--alabaster); font-size: 12px; letter-spacing: 0; text-transform: none; }
+
 /* ── HITOS ──────────────────────────────────────────────────── */
 .hito { display: flex; align-items: flex-start; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--alabaster2); }
 .hito:last-child { border-bottom: none; }
@@ -963,29 +968,64 @@ function summaryHTML(cells) {
 
 function buildCapital(rows) {
   document.getElementById('cnt-capital').textContent = rows.length;
-  const total = rows.reduce((s,r)=>s+(+r.monto||0),0);
-  const target = rows.reduce((s,r)=>s+(+r.target_payout||0),0);
+  const total    = rows.reduce((s,r)=>s+(+r.monto||0),0);
+  const target   = rows.reduce((s,r)=>s+(+r.target_payout||0),0);
   const recibido = rows.filter(r=>r.status?.toLowerCase()==='recibido').reduce((s,r)=>s+(+r.monto||0),0);
+
+  // Unique investors count
+  const uniqueInv = new Set(rows.map(r=>r.inversionista).filter(Boolean)).size;
+  // Unique tranches
+  const tranches  = [...new Set(rows.map(r=>r.tranche).filter(Boolean))].sort();
+
   document.getElementById('ts-capital').innerHTML = summaryHTML([
-    {label:'Total Aportado',    value:fmtM(total),    cls:'accent', sub:'LP equity'},
-    {label:'Target Payout 1.5×',value:fmtM(target),               sub:'Obligación total'},
-    {label:'Capital Recibido',  value:fmtM(recibido), cls:'success',sub:rows.length+' tranches'},
-    {label:'Rendimiento LP',    value:fmtM(target-total),          sub:'Yield objetivo'},
+    {label:'Total Aportado',     value:fmtM(total),    cls:'accent',  sub:`${uniqueInv} inversionista${uniqueInv!==1?'s':''} · ${tranches.length} tranches`},
+    {label:'Target Payout 1.5×', value:fmtM(target),                  sub:'Obligación total LP'},
+    {label:'Capital Recibido',   value:fmtM(recibido), cls:'success',  sub:fmtPct(total?(recibido/total*100):0)+' del total'},
+    {label:'Rendimiento LP',     value:fmtM(target-total),             sub:'Yield objetivo'},
   ]);
+
+  // Group by tranche
+  const byTranche = {};
+  rows.forEach((r,i)=>{
+    const t = r.tranche || 'Sin Tranche';
+    if(!byTranche[t]) byTranche[t]={rows:[], total:0, target:0, recibido:0};
+    byTranche[t].rows.push({...r, _idx:i});
+    byTranche[t].total    += (+r.monto||0);
+    byTranche[t].target   += (+r.target_payout||0);
+    byTranche[t].recibido += r.status?.toLowerCase()==='recibido'?(+r.monto||0):0;
+  });
+
   const tbody = document.getElementById('tbody-capital');
-  tbody.innerHTML = rows.map((r,i)=>`<tr onclick="openDrawer('capital',${i})" data-search="${[r.inversionista,r.instrumento,r.tranche,r.fecha,r.status,r.notas].join(' ').toLowerCase()}">
-    <td class="bold">${safe(r.inversionista)}</td>
-    <td>${safe(r.instrumento)}</td>
-    <td class="terra">Tranche ${safe(r.tranche)}</td>
-    <td>${safe(r.fecha)}</td>
-    <td class="num terra">${fmtMFull(r.monto)}</td>
-    <td class="num">${r.porcentaje_participacion ? fmtPct(r.porcentaje_participacion) : '—'}</td>
-    <td class="num">${fmtMFull(r.target_payout)}</td>
-    <td class="muted">${safe(r.timing)}</td>
-    <td>${badge(r.status)}</td>
-    <td class="muted">${safe(r.notas)}</td>
-  </tr>`).join('');
-  document.getElementById('info-capital').textContent = `${rows.length} registro${rows.length!==1?'s':''}`;
+  const COLS = 10; // number of columns in thead
+  let html = '';
+  Object.keys(byTranche).sort().forEach(t=>{
+    const g = byTranche[t];
+    const invNames = [...new Set(g.rows.map(r=>r.inversionista).filter(Boolean))];
+    const pctTotal = total ? (g.total/total*100) : 0;
+    // Tranche header row
+    html += `<tr class="tr-group-hdr"><td colspan="${COLS}">
+      TRANCHE ${safe(t)}
+      <span class="tg-meta">${g.rows.length} inversionista${g.rows.length!==1?'s':''} · ${invNames.slice(0,3).join(', ')}${invNames.length>3?'…':''}</span>
+      <span class="tg-total">${fmtMFull(g.total)} <span style="opacity:.6;font-size:10px">(${fmtPct(pctTotal)} del total)</span></span>
+    </td></tr>`;
+    // Investor rows within tranche
+    g.rows.forEach(r=>{
+      html += `<tr onclick="openDrawer('capital',${r._idx})" data-search="${[r.inversionista,r.instrumento,r.tranche,r.fecha,r.status,r.notas].join(' ').toLowerCase()}">
+        <td class="bold">${safe(r.inversionista)}</td>
+        <td>${safe(r.instrumento)}</td>
+        <td class="terra">Tranche ${safe(r.tranche)}</td>
+        <td>${safe(r.fecha)}</td>
+        <td class="num terra">${fmtMFull(r.monto)}</td>
+        <td class="num">${r.porcentaje_participacion ? fmtPct(r.porcentaje_participacion) : '—'}</td>
+        <td class="num">${fmtMFull(r.target_payout)}</td>
+        <td class="muted">${safe(r.timing)}</td>
+        <td>${badge(r.status)}</td>
+        <td class="muted">${safe(r.notas)}</td>
+      </tr>`;
+    });
+  });
+  tbody.innerHTML = html;
+  document.getElementById('info-capital').textContent = `${rows.length} inversionista${rows.length!==1?'s':''} · ${tranches.length} tranches`;
 }
 
 function buildVentas(rows) {
