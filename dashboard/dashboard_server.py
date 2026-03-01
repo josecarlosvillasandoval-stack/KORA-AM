@@ -191,7 +191,10 @@ def load_from_sheets():
 
     def tab(name):
         try:
-            return ss.worksheet(name).get_all_records()
+            # UNFORMATTED_VALUE devuelve números como números, evita bugs de formato %/europeo
+            return ss.worksheet(name).get_all_records(
+                value_render_option='UNFORMATTED_VALUE'
+            )
         except Exception:
             return []
 
