@@ -1015,9 +1015,8 @@ function initCharts() {
 
   charts.costos = new Chart(document.getElementById('chart-costos'), {
     type: 'doughnut',
-    data: { labels:['Tierra','Construcción','Acabados','Legal/Notarial','Otros'],
-      datasets:[{data:[9040000,47752578,7200000,1300000,8870932],
-        backgroundColor:[GRAPHITE,TERRA,BRONZE,'#b8a898','#d5cfc7'], borderColor:'#ffffff', borderWidth:3}] },
+    data: { labels:[], datasets:[{data:[],
+        backgroundColor:[GRAPHITE,TERRA,BRONZE,'#b8a898','#d5cfc7','#c8bdb0'], borderColor:'#ffffff', borderWidth:3}] },
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
       plugins:{legend:{position:'right',labels:{font:{size:10},padding:12,usePointStyle:true,pointStyle:'rect'}},
         tooltip:{callbacks:{label:c=>' '+c.label+': $'+(c.raw/1e6).toFixed(1)+'M'}}}}
@@ -1026,7 +1025,7 @@ function initCharts() {
   charts.cobType = new Chart(document.getElementById('chart-cob-type'), {
     type: 'doughnut',
     data: { labels:['Enganche (30%)','Diferido (20%)','Residual (50%)'],
-      datasets:[{data:[28980000,19320000,48300000], backgroundColor:[TERRA,BRONZE,'#b8a898'], borderColor:'#ffffff', borderWidth:3}] },
+      datasets:[{data:[0,0,0], backgroundColor:[TERRA,BRONZE,'#b8a898'], borderColor:'#ffffff', borderWidth:3}] },
     options:{ responsive:true, maintainAspectRatio:false, cutout:'62%',
       plugins:{legend:{position:'right',labels:{font:{size:10},padding:12,usePointStyle:true,pointStyle:'rect'}},
         tooltip:{callbacks:{label:c=>' '+c.label+': $'+(c.raw/1e6).toFixed(1)+'M'}}}}
@@ -1726,7 +1725,13 @@ async function loadNav() {
     _projects = await r.json();
   } catch(e) { _projects = []; }
   buildNav();
-  await showPortfolio();
+  // Si hay exactamente 1 proyecto → abre directo en ese proyecto (como antes)
+  // Si hay 2+ proyectos → abre en Portfolio Consolidado
+  if (_projects.length === 1) {
+    await showProject(_projects[0].proyecto_id);
+  } else {
+    await showPortfolio();
+  }
   document.getElementById('loading').classList.add('hidden');
 }
 
@@ -1866,6 +1871,26 @@ async function showProject(pid) {
 
 function renderProject(d) {
   updateSummary(d);
+
+  // ── Pie chart costos: usar datos reales de PRESUPUESTO ──────
+  const ppto = (d.detail || {}).presupuesto || [];
+  if (ppto.length > 0) {
+    const cats = {};
+    ppto.forEach(r => { const c = r.categoria||'Otros'; cats[c] = (cats[c]||0) + (+r.presupuestado||0); });
+    const sorted = Object.entries(cats).sort((a,b) => b[1]-a[1]);
+    charts.costos.data.labels           = sorted.map(e => e[0]);
+    charts.costos.data.datasets[0].data = sorted.map(e => e[1]);
+    charts.costos.update();
+  }
+
+  // ── Pie chart cobranza: usar revenue proforma ──────────────
+  const k = d.kpis || {};
+  const revPF = k.revenue_proforma || 0;
+  if (revPF > 0) {
+    charts.cobType.data.datasets[0].data = [revPF*0.30, revPF*0.20, revPF*0.50];
+    charts.cobType.update();
+  }
+
   const det = d.detail || {};
   _detailData = {
     capital:     det.capital_calls || [],
