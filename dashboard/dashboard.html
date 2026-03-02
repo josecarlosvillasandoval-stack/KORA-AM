@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d1b2a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>KORA AM — PRY-002 Mártires 122</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -358,11 +361,64 @@ body {
   .row-2, .row-3 { grid-template-columns: 1fr; }
   .tab-summary.cols-5 { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* tablet landscape */
+@media (max-width: 1024px) {
+  .fondo-grid { grid-template-columns: repeat(2, 1fr); }
+  .tab-summary.cols-5 { grid-template-columns: repeat(3, 1fr); }
+}
+
+/* tablet portrait / large phone */
 @media (max-width: 768px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .port-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .fondo-grid { grid-template-columns: repeat(2, 1fr); }
+  .bva-cmp { grid-template-columns: 1fr; }
+  .row-2-eq { grid-template-columns: 1fr; }
+  .tab-summary.cols-4,
+  .tab-summary.cols-5 { grid-template-columns: repeat(2, 1fr); }
   .topbar { padding: 0 16px; }
-  .content { padding: 16px; }
+  .content { padding: 12px; }
+  .card { padding: 14px 16px; }
+  .chart-wrap { height: 180px; }
   .drawer { width: 100%; }
+  .subheader { flex-wrap: wrap; gap: 6px; }
+  #sh-v1, #sh-v2, #sh-meta-2 { display: none; }
+  .tab-btn { padding: 10px 14px; font-size: 10px; min-height: 36px; }
+  .tab-panel { overflow-x: auto; }
+  .data-table { min-width: 600px; }
+}
+
+/* phone portrait */
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr; }
+  .port-kpi-grid { grid-template-columns: 1fr; }
+  .fondo-grid { grid-template-columns: 1fr; }
+  .tab-summary.cols-3,
+  .tab-summary.cols-4,
+  .tab-summary.cols-5 { grid-template-columns: repeat(2, 1fr); }
+  .topbar { padding: 0 12px; }
+  .topbar-label,
+  .topbar-time { display: none; }
+  .proj-nav { gap: 6px; }
+  .proj-btn { font-size: 11px; padding: 6px 12px; min-height: 32px; }
+  .tab-nav { overflow-x: auto; flex-wrap: nowrap; }
+  .tab-btn { min-width: fit-content; font-size: 10px; }
+  .subheader-meta { display: none; }
+  .kpi-value { font-size: 22px; }
+  .mes-block { flex-direction: column; gap: 8px; }
+  .chart-wrap { height: 160px; }
+  .chart-wrap-sm { height: 130px; }
+  .wf-item { padding: 14px 0; }
+  .hito { flex-direction: column; gap: 4px; }
+  .drawer { width: 100%; height: 92dvh; top: auto; }
+  .card { padding: 12px 14px; }
+}
+
+/* touch targets */
+.tab-btn, .proj-btn, .refresh-btn {
+  min-height: 36px;
+  touch-action: manipulation;
 }
 
 /* ── PROJECT NAV ─────────────────────────────────────────────── */
