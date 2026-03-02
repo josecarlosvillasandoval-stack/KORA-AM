@@ -141,6 +141,32 @@ body {
 .wf-bar-fill.b { background: var(--bronze); }
 .wf-bar-fill.c { background: #b8a898; }
 
+/* ── BVA ────────────────────────────────────────────────────── */
+.bva-btn { background: var(--black) !important; color: #fff !important; font-weight: 700 !important; }
+.bva-btn.active { background: var(--terra) !important; }
+.bva-section-hdr { font-family: var(--font-head); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--graphite); padding: 14px 0 8px; border-bottom: 2px solid var(--black); margin-bottom: 0; }
+.bva-bar-track { height: 6px; background: #e8e0d6; border-radius: 3px; min-width: 120px; }
+.bva-bar-fill  { height: 100%; border-radius: 3px; transition: width .6s ease; }
+.bva-bar-ok    { background: #4caf50; }
+.bva-bar-warn  { background: var(--terra); }
+.bva-bar-over  { background: #e53935; }
+.bva-cmp { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; padding: 16px 0; }
+.bva-cmp-card { background: var(--alabaster); border-radius: 8px; padding: 18px 20px; }
+.bva-cmp-label { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.bva-cmp-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.bva-cmp-key { font-size: 12px; color: var(--graphite); }
+.bva-cmp-val { font-family: var(--font-mono); font-size: 14px; font-weight: 700; }
+.bva-cmp-val.modelo { color: var(--muted); }
+.bva-cmp-val.real   { color: var(--terra); }
+.bva-cmp-pct { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
+.bva-cmp-pct.ok   { background: #e8f5e9; color: #2e7d32; }
+.bva-cmp-pct.warn { background: #fff3e0; color: #e65100; }
+.bva-cmp-pct.bad  { background: #ffebee; color: #c62828; }
+.var-pos { color: #c62828; font-weight: 600; }  /* sobre presupuesto */
+.var-neg { color: #2e7d32; font-weight: 600; }  /* bajo presupuesto */
+.delta-pos { color: #2e7d32; font-weight: 600; } /* adelantado */
+.delta-neg { color: #c62828; font-weight: 600; } /* atrasado */
+
 /* ── TRANCHE GROUP ROWS ─────────────────────────────────────── */
 .tr-group-hdr td { background: var(--black); color: #fff; font-family: var(--font-head); font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; padding: 8px 12px; pointer-events: none; }
 .tr-group-hdr td .tg-meta { font-family: var(--font-body); font-weight: 400; font-size: 11px; letter-spacing: 0; text-transform: none; color: #aaa; margin-left: 12px; }
@@ -548,6 +574,7 @@ body {
       <button class="tab-btn"        data-tab="obra"         onclick="switchTab('obra')">Avance Obra      <span class="tab-count" id="cnt-obra">0</span></button>
       <button class="tab-btn"        data-tab="hitos"        onclick="switchTab('hitos')">Hitos            <span class="tab-count" id="cnt-hitos">0</span></button>
       <button class="tab-btn"        data-tab="deuda"        onclick="switchTab('deuda')">Deuda            <span class="tab-count" id="cnt-deuda">0</span></button>
+      <button class="tab-btn bva-btn" data-tab="bva"          onclick="switchTab('bva')">Modelo vs Real</button>
     </div>
 
     <!-- TAB: CAPITAL LP -->
@@ -729,6 +756,63 @@ body {
         <div class="ts-cell"><div class="ts-label">LTV</div><div class="ts-value">0.0%</div><div class="ts-sub">N/A — 100% equity</div></div>
       </div>
       <div class="tbl-empty">Mártires 122 es un proyecto 100% equity — sin deuda bancaria.<br>Esta sección se habilitará si se contrata financiamiento en el futuro.</div>
+    </div>
+
+    <!-- TAB: MODELO VS REAL (BVA) -->
+    <div class="tab-panel" id="tab-bva">
+      <div class="tab-summary cols-4" id="ts-bva"></div>
+
+      <!-- COSTOS -->
+      <div class="bva-section-hdr">Costos — Presupuesto vs Ejecutado</div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-bva-costos">
+          <thead><tr>
+            <th>Categoría</th>
+            <th class="num">Modelo</th>
+            <th class="num">Real Ejecutado</th>
+            <th class="num">Varianza ($)</th>
+            <th class="num">% Ejecución</th>
+            <th style="width:180px">Avance</th>
+          </tr></thead>
+          <tbody id="tbody-bva-costos"></tbody>
+        </table>
+      </div>
+
+      <!-- INGRESOS -->
+      <div class="bva-section-hdr" style="margin-top:28px">Ingresos (Ventas) — Modelo vs Real</div>
+      <div id="bva-ingresos"></div>
+
+      <!-- COBRANZA -->
+      <div class="bva-section-hdr" style="margin-top:28px">Cobranza — Esperado vs Cobrado</div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-bva-cobr">
+          <thead><tr>
+            <th>Unidad</th>
+            <th>Comprador</th>
+            <th class="num">Enganche Esperado</th>
+            <th class="num">Cobrado</th>
+            <th class="num">Pendiente</th>
+            <th class="num">% Cobro</th>
+          </tr></thead>
+          <tbody id="tbody-bva-cobr"></tbody>
+        </table>
+      </div>
+
+      <!-- AVANCE OBRA -->
+      <div class="bva-section-hdr" style="margin-top:28px">Avance de Obra — Objetivo vs Real</div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="tbl-bva-avance">
+          <thead><tr>
+            <th>Mes</th>
+            <th>Actividad</th>
+            <th class="num">Objetivo</th>
+            <th class="num">Real</th>
+            <th class="num">Delta</th>
+            <th style="width:180px">Avance real</th>
+          </tr></thead>
+          <tbody id="tbody-bva-avance"></tbody>
+        </table>
+      </div>
     </div>
 
   </div><!-- /drill-section -->
@@ -1369,6 +1453,157 @@ function closeDrawer(event) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// BVA — MODELO VS REAL
+// ─────────────────────────────────────────────────────────────
+function buildBVA(bva) {
+  if (!bva || !bva.costos) return;
+
+  const ct   = bva.costos_total   || {};
+  const ing  = bva.ingresos       || {};
+  const cobr = bva.cobranza       || {};
+  const marg = bva.margen         || {};
+
+  // ── KPI strip ──────────────────────────────────────────────
+  const pctCosto = ct.pct_ejecucion || 0;
+  const pctIng   = ing.pct_avance   || 0;
+  const pctCobr  = cobr.tasa_cobro  || 0;
+  const avanceActual = (bva.avance || []).filter(a => a.real > 0).pop();
+  const deltaObra = avanceActual ? avanceActual.delta : 0;
+
+  const clsBarra = p => p > 100 ? 'bad' : p >= 80 ? 'warn' : 'ok';
+
+  document.getElementById('ts-bva').innerHTML = summaryHTML([
+    { label: 'Costos Ejecutados',   value: fmtM(ct.real || 0),
+      cls: pctCosto > 100 ? 'accent' : 'success',
+      sub: `${pctCosto}% del presupuesto` },
+    { label: 'Ingresos Firmados',   value: fmtM(ing.revenue_real || 0),
+      cls: pctIng >= 50 ? 'success' : '',
+      sub: `${pctIng}% del modelo · ${ing.unidades_real}/${ing.unidades_modelo} unidades` },
+    { label: 'Cobranza Recibida',   value: fmtM(cobr.cobrado || 0),
+      cls: pctCobr === 100 ? 'success' : '',
+      sub: `${pctCobr}% cobrado de enganche` },
+    { label: 'Margen Real Parcial', value: fmtM(marg.real || 0),
+      sub: `${marg.pct_real || 0}% real vs ${marg.pct_modelo || 0}% modelo` },
+  ]);
+
+  // ── Costos por categoría ────────────────────────────────────
+  const tbodyCostos = document.getElementById('tbody-bva-costos');
+  const costoRows = bva.costos || [];
+
+  let html = '';
+  costoRows.forEach(r => {
+    const pct = r.pct_ejecucion || 0;
+    const barW = Math.min(pct, 100);
+    const barCls = pct > 100 ? 'bva-bar-over' : pct > 85 ? 'bva-bar-warn' : 'bva-bar-ok';
+    const varCls = r.varianza > 0 ? 'var-pos' : 'var-neg';
+    const varSign = r.varianza > 0 ? '+' : '';
+    html += `<tr>
+      <td class="bold">${safe(r.categoria)}</td>
+      <td class="num muted">${fmtMFull(r.modelo)}</td>
+      <td class="num terra">${fmtMFull(r.real)}</td>
+      <td class="num ${varCls}">${varSign}${fmtMFull(r.varianza)}</td>
+      <td class="num"><b>${pct}%</b></td>
+      <td><div class="bva-bar-track"><div class="bva-bar-fill ${barCls}" style="width:${barW}%"></div></div></td>
+    </tr>`;
+  });
+
+  // Fila total
+  const totPct = ct.pct_ejecucion || 0;
+  const totBarW = Math.min(totPct, 100);
+  const totBarCls = totPct > 100 ? 'bva-bar-over' : totPct > 85 ? 'bva-bar-warn' : 'bva-bar-ok';
+  const totVarCls = (ct.varianza||0) > 0 ? 'var-pos' : 'var-neg';
+  const totVarSign = (ct.varianza||0) > 0 ? '+' : '';
+  html += `<tr style="border-top:2px solid var(--black);font-weight:700">
+    <td>TOTAL</td>
+    <td class="num muted">${fmtMFull(ct.modelo||0)}</td>
+    <td class="num terra">${fmtMFull(ct.real||0)}</td>
+    <td class="num ${totVarCls}">${totVarSign}${fmtMFull(ct.varianza||0)}</td>
+    <td class="num"><b>${totPct}%</b></td>
+    <td><div class="bva-bar-track"><div class="bva-bar-fill ${totBarCls}" style="width:${totBarW}%"></div></div></td>
+  </tr>`;
+  tbodyCostos.innerHTML = html;
+
+  // ── Ingresos ────────────────────────────────────────────────
+  const pctClsIng = pctIng >= 100 ? 'ok' : pctIng >= 50 ? 'warn' : 'warn';
+  const pctClsUni = ing.pct_unidades >= 100 ? 'ok' : 'warn';
+  document.getElementById('bva-ingresos').innerHTML = `
+    <div class="bva-cmp">
+      <div class="bva-cmp-card">
+        <div class="bva-cmp-label">Revenue</div>
+        <div class="bva-cmp-row">
+          <span class="bva-cmp-key">Modelo (proforma)</span>
+          <span class="bva-cmp-val modelo">${fmtMFull(ing.revenue_modelo||0)}</span>
+        </div>
+        <div class="bva-cmp-row">
+          <span class="bva-cmp-key">Real (firmado)</span>
+          <span class="bva-cmp-val real">${fmtMFull(ing.revenue_real||0)}</span>
+        </div>
+        <div class="bva-cmp-row" style="margin-top:8px">
+          <span class="bva-cmp-key">Avance</span>
+          <span class="bva-cmp-pct ${pctClsIng}">${pctIng}%</span>
+        </div>
+      </div>
+      <div class="bva-cmp-card">
+        <div class="bva-cmp-label">Unidades</div>
+        <div class="bva-cmp-row">
+          <span class="bva-cmp-key">Modelo (total)</span>
+          <span class="bva-cmp-val modelo">${ing.unidades_modelo||0} unidades</span>
+        </div>
+        <div class="bva-cmp-row">
+          <span class="bva-cmp-key">Real (firmadas)</span>
+          <span class="bva-cmp-val real">${ing.unidades_real||0} unidades</span>
+        </div>
+        <div class="bva-cmp-row" style="margin-top:8px">
+          <span class="bva-cmp-key">Absorción</span>
+          <span class="bva-cmp-pct ${pctClsUni}">${ing.pct_unidades||0}%</span>
+        </div>
+      </div>
+    </div>`;
+
+  // ── Cobranza por unidad ─────────────────────────────────────
+  const tbodyCobr = document.getElementById('tbody-bva-cobr');
+  const cobrDet = (cobr.detalle || []);
+  if (cobrDet.length === 0) {
+    tbodyCobr.innerHTML = `<tr><td colspan="6" class="tbl-empty">Sin ventas firmadas aún</td></tr>`;
+  } else {
+    tbodyCobr.innerHTML = cobrDet.map(r => {
+      const pct = r.tasa || 0;
+      const cls = pct === 100 ? 'var-neg' : pct > 0 ? '' : 'var-pos';
+      return `<tr>
+        <td class="bold terra">${safe(r.unidad_id)}</td>
+        <td>${safe(r.comprador)}</td>
+        <td class="num muted">${fmtMFull(r.esperado)}</td>
+        <td class="num terra">${fmtMFull(r.cobrado)}</td>
+        <td class="num ${r.pendiente > 0 ? 'var-pos' : ''}">${fmtMFull(r.pendiente)}</td>
+        <td class="num"><b class="${pct===100?'var-neg':''}">${pct}%</b></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // ── Avance obra ─────────────────────────────────────────────
+  const tbodyAv = document.getElementById('tbody-bva-avance');
+  const avRows = (bva.avance || []).filter(a => a.objetivo > 0 || a.real > 0);
+  if (avRows.length === 0) {
+    tbodyAv.innerHTML = `<tr><td colspan="6" class="tbl-empty">Sin datos de avance</td></tr>`;
+  } else {
+    tbodyAv.innerHTML = avRows.map(a => {
+      const barW = Math.min(a.real, 100);
+      const barCls = a.delta < -2 ? 'bva-bar-over' : a.delta < 0 ? 'bva-bar-warn' : 'bva-bar-ok';
+      const deltaCls = a.delta > 0 ? 'delta-pos' : a.delta < 0 ? 'delta-neg' : '';
+      const deltaSign = a.delta > 0 ? '+' : '';
+      return `<tr>
+        <td class="muted">M${a.mes}</td>
+        <td>${safe(a.actividad)}</td>
+        <td class="num muted">${a.objetivo}%</td>
+        <td class="num terra"><b>${a.real}%</b></td>
+        <td class="num ${deltaCls}">${deltaSign}${a.delta}pp</td>
+        <td><div class="bva-bar-track"><div class="bva-bar-fill ${barCls}" style="width:${barW}%"></div></div></td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // DATA LOAD
 // ─────────────────────────────────────────────────────────────
 async function loadData() {
@@ -1400,6 +1635,7 @@ async function loadData() {
     buildPresupuesto(_detailData.presupuesto);
     buildObra(_detailData.obra);
     buildHitos(_detailData.hitos);
+    buildBVA(d.bva || {});
     document.getElementById('cnt-deuda').textContent = 0;
 
     document.getElementById('loading').classList.add('hidden');

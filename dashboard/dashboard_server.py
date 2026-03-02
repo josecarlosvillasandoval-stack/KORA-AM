@@ -313,6 +313,8 @@ def load_from_sheets():
         'hitos':               hitos,
     }
 
+    bva = compute_bva(ppto_rows, gastos_rows, ventas_rows, cobranza_rows, avance_rows, prem)
+
     return build_payload(summary, by_month, waterfall, source='sheets',
                          detail_capital=capital_rows,
                          detail_ventas=ventas_rows,
@@ -321,7 +323,8 @@ def load_from_sheets():
                          detail_presupuesto=ppto_rows,
                          detail_hitos=hitos_rows,
                          detail_avance=avance_rows,
-                         detail_deuda=deuda_rows)
+                         detail_deuda=deuda_rows,
+                         bva=bva)
 
 
 def load_static():
@@ -403,6 +406,114 @@ def load_static():
     return build_payload(summary, by_month, waterfall, source='static')
 
 
+def compute_bva(ppto_rows, gastos_rows, ventas_rows, cobranza_rows, avance_rows, prem):
+    """Calcula la comparativa Modelo vs Real para el tab BVA."""
+
+    # ── Costos por categoría ────────────────────────────────────────────────────
+    modelo_cat = {}
+    for r in ppto_rows:
+        cat = r.get('categoria', 'Sin categoría')
+        modelo_cat[cat] = modelo_cat.get(cat, 0) + parse_num(r.get('presupuestado', 0))
+
+    real_cat = {}
+    for r in gastos_rows:
+        cat = r.get('categoria', 'Sin categoría')
+        real_cat[cat] = real_cat.get(cat, 0) + parse_num(r.get('pagado', 0))
+
+    all_cats = sorted(set(list(modelo_cat.keys()) + list(real_cat.keys())),
+                      key=lambda c: -modelo_cat.get(c, 0))
+    costos = []
+    for cat in all_cats:
+        m = modelo_cat.get(cat, 0)
+        r = real_cat.get(cat, 0)
+        varianza = r - m   # positivo = sobre presupuesto (malo)
+        pct = round(r / m * 100, 1) if m else 0
+        costos.append({'categoria': cat, 'modelo': m, 'real': r,
+                       'varianza': varianza, 'pct_ejecucion': pct})
+
+    total_modelo_costo = sum(modelo_cat.values())
+    total_real_costo   = sum(real_cat.values())
+
+    # ── Ingresos (ventas) ───────────────────────────────────────────────────────
+    revenue_modelo  = parse_num(prem.get('revenue_total', 96_600_000))
+    total_unidades  = int(parse_num(prem.get('total_unidades', 15)))
+    enganche_pct    = parse_num(prem.get('enganche_pct', 0.3))
+
+    firmadas = [v for v in ventas_rows if str(v.get('status', '')).lower() == 'firmado']
+    revenue_real    = sum(parse_num(v.get('precio_lista', 0)) for v in firmadas)
+    unidades_real   = len(firmadas)
+
+    # ── Cobranza ────────────────────────────────────────────────────────────────
+    enganche_esperado = sum(parse_num(v.get('enganche', 0)) for v in firmadas)
+    cobrado_total     = sum(parse_num(c.get('monto', 0)) for c in cobranza_rows
+                            if str(c.get('status', '')).lower() == 'recibido')
+    tasa_cobro = round(cobrado_total / enganche_esperado * 100, 1) if enganche_esperado else 0
+
+    # Desglose cobranza por unidad
+    cobrado_x_unidad = {}
+    for c in cobranza_rows:
+        uid = c.get('unidad_id', '?')
+        cobrado_x_unidad[uid] = cobrado_x_unidad.get(uid, 0) + parse_num(c.get('monto', 0))
+
+    cobranza_detalle = []
+    for v in firmadas:
+        uid = v.get('unidad_id', '?')
+        esp = parse_num(v.get('enganche', 0))
+        cob = cobrado_x_unidad.get(uid, 0)
+        cobranza_detalle.append({
+            'unidad_id': uid, 'comprador': v.get('comprador', '—'),
+            'esperado': esp, 'cobrado': cob,
+            'pendiente': esp - cob,
+            'tasa': round(cob / esp * 100, 1) if esp else 0,
+        })
+
+    # ── Avance obra ─────────────────────────────────────────────────────────────
+    avance_bva = []
+    for a in avance_rows:
+        obj  = parse_num(a.get('pct_objetivo', 0))
+        real = parse_num(a.get('pct_avance', 0))
+        avance_bva.append({
+            'mes':       a.get('mes', 0),
+            'actividad': a.get('actividad', ''),
+            'objetivo':  obj,
+            'real':      real,
+            'delta':     round(real - obj, 1),
+        })
+
+    # ── Margen estimado ─────────────────────────────────────────────────────────
+    margen_modelo = parse_num(prem.get('margen_bruto', revenue_modelo - total_modelo_costo))
+    margen_real   = revenue_real - total_real_costo
+    pct_margen_modelo = round(margen_modelo / revenue_modelo * 100, 1) if revenue_modelo else 0
+    pct_margen_real   = round(margen_real / revenue_real * 100, 1) if revenue_real else 0
+
+    return {
+        'costos': costos,
+        'costos_total': {
+            'modelo': total_modelo_costo, 'real': total_real_costo,
+            'varianza': total_real_costo - total_modelo_costo,
+            'pct_ejecucion': round(total_real_costo / total_modelo_costo * 100, 1) if total_modelo_costo else 0,
+        },
+        'ingresos': {
+            'revenue_modelo': revenue_modelo, 'revenue_real': revenue_real,
+            'varianza': revenue_real - revenue_modelo,
+            'pct_avance': round(revenue_real / revenue_modelo * 100, 1) if revenue_modelo else 0,
+            'unidades_modelo': total_unidades, 'unidades_real': unidades_real,
+            'pct_unidades': round(unidades_real / total_unidades * 100, 1) if total_unidades else 0,
+        },
+        'cobranza': {
+            'esperado': enganche_esperado, 'cobrado': cobrado_total,
+            'pendiente': enganche_esperado - cobrado_total,
+            'tasa_cobro': tasa_cobro,
+            'detalle': cobranza_detalle,
+        },
+        'avance': avance_bva,
+        'margen': {
+            'modelo': margen_modelo, 'real': margen_real,
+            'pct_modelo': pct_margen_modelo, 'pct_real': pct_margen_real,
+        },
+    }
+
+
 _NUMERIC_KEYS = {
     'monto','precio_lista','enganche','diferido','residual','presupuestado','pagado',
     'target_payout','pct_avance','pct_objetivo','porcentaje_participacion',
@@ -432,7 +543,7 @@ def sanitize_rows(rows):
 def build_payload(summary, by_month, waterfall, source='static',
                   detail_capital=None, detail_ventas=None, detail_cobranza=None,
                   detail_gastos=None, detail_presupuesto=None, detail_hitos=None,
-                  detail_avance=None, detail_deuda=None):
+                  detail_avance=None, detail_deuda=None, bva=None):
     """Construye el JSON final que consume el dashboard."""
     # Mes actual del proyecto (M0 = Abr-2026)
     proyecto_start = date(2026, 4, 1)
@@ -538,6 +649,7 @@ def build_payload(summary, by_month, waterfall, source='static',
             'avance':         sanitize_rows(detail_avance or []),
             'deuda':          sanitize_rows(detail_deuda or []),
         },
+        'bva': bva or {},
     }
 
 
