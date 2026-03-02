@@ -274,6 +274,32 @@ def load_project(meta):
     delta = (today.year-proyecto_start.year)*12+(today.month-proyecto_start.month)
     mes_actual = max(0, min(36, delta))
 
+    # ── Cashflow proforma (spread uniforme del presupuesto)
+    monthly_cost = ppto_total / 36 if ppto_total else 0
+    monthly_rev  = rev_total  / 36 if rev_total  else 0
+    cf_proforma = []
+    cum = 0.0
+    for _ in range(37):
+        cum += (monthly_rev - monthly_cost) / 1e6
+        cf_proforma.append(round(cum, 3))
+
+    # ── By month (agrega ventas y cobranza por mes)
+    bym = {}
+    def _bym(mes):
+        m = int(parse_num(mes, 0))
+        if m not in bym:
+            bym[m] = {'mes': m, 'label': labels[m] if 0 <= m < len(labels) else f'M{m}',
+                      'ventas_firmadas': 0, 'revenue_firmado': 0.0, 'cobrado_total': 0.0}
+        return bym[m]
+    for v in firmadas:
+        r = _bym(v.get('mes', 0))
+        r['ventas_firmadas'] += 1
+        r['revenue_firmado'] += parse_num(v.get('precio_lista', 0))
+    for c in cobr_rows:
+        r = _bym(c.get('mes', 0))
+        r['cobrado_total'] += parse_num(c.get('monto', 0))
+    by_month_list = sorted(bym.values(), key=lambda x: x['mes'])
+
     return {
         'meta': {
             'proyecto_id':   pid,
@@ -324,6 +350,11 @@ def load_project(meta):
             'deuda':         sanitize_rows(deuda_rows),
         },
         'bva': bva,
+        'cashflow': {
+            'labels':   labels,
+            'proforma': cf_proforma,
+        },
+        'by_month': by_month_list,
     }
 
 # ── Portfolio consolidado ──────────────────────────────────────────────────────

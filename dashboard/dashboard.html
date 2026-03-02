@@ -1087,20 +1087,24 @@ function updateSummary(d) {
   document.getElementById('kv-multiple').textContent  = `${k.lp_multiple}×`;
 
   // Charts
-  const cf = d.cashflow;
-  let realAcum = [], cum = 0;
-  for (const r of d.by_month) { cum += (r.cobrado_total - r.costo_ejecutado)/1e6; realAcum.push(parseFloat(cum.toFixed(2))); }
-  const step = 3;
-  charts.cf.data.labels           = cf.labels.filter((_,i)=>i%step===0);
-  charts.cf.data.datasets[0].data = cf.proforma.filter((_,i)=>i%step===0);
-  charts.cf.data.datasets[1].data = realAcum.filter((_,i)=>i%step===0);
-  charts.cf.update();
+  if (d.cashflow && d.by_month) {
+    const cf = d.cashflow;
+    let realAcum = [], cum = 0;
+    for (const r of d.by_month) { cum += (r.cobrado_total - 0)/1e6; realAcum.push(parseFloat(cum.toFixed(2))); }
+    // pad realAcum to same length as labels
+    while (realAcum.length < cf.labels.length) realAcum.push(realAcum[realAcum.length-1]||0);
+    const step = 3;
+    charts.cf.data.labels           = cf.labels.filter((_,i)=>i%step===0);
+    charts.cf.data.datasets[0].data = cf.proforma.filter((_,i)=>i%step===0);
+    charts.cf.data.datasets[1].data = realAcum.filter((_,i)=>i%step===0);
+    charts.cf.update();
 
-  const bm = d.by_month.filter(r=>r.ventas_firmadas>0||r.cobrado_total>0||r.revenue_firmado>0);
-  charts.ventas.data.labels           = bm.map(r=>r.label);
-  charts.ventas.data.datasets[0].data = bm.map(r=>r.revenue_firmado/1e6);
-  charts.ventas.data.datasets[1].data = bm.map(r=>r.cobrado_total/1e6);
-  charts.ventas.update();
+    const bm = d.by_month.filter(r=>r.ventas_firmadas>0||r.cobrado_total>0||r.revenue_firmado>0);
+    charts.ventas.data.labels           = bm.map(r=>r.label);
+    charts.ventas.data.datasets[0].data = bm.map(r=>r.revenue_firmado/1e6);
+    charts.ventas.data.datasets[1].data = bm.map(r=>r.cobrado_total/1e6);
+    charts.ventas.update();
+  }
 
   // Waterfall
   const wfEl = document.getElementById('wf-container');
