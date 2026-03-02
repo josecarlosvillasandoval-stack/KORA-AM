@@ -1,33 +1,26 @@
 """
-dashboard_server.py — KORA AM Dashboard Server
-Sirve el dashboard operativo en http://localhost:5002
+dashboard_server.py — KORA AM Dashboard Server (Multi-Proyecto)
 
-Fuentes de datos:
-  1. Supabase (kora_finance_mart, kora_ops_mart, kora_investor_mart)  ← modo producción
-  2. Google Sheets directo (gspread)                                  ← fallback si dbt no ha corrido
-  3. Datos estáticos de Premisas                                      ← fallback final
+Arquitectura:
+  - REGISTRY tab en el Sheet maestro lista todos los proyectos del portfolio
+  - Cada proyecto tiene su propio Google Sheet con tabs estándar
+  - /api/portfolio  → consolidado de todos los proyectos
+  - /api/proyecto/<id> → datos completos de un proyecto
+  - /api/projects  → lista de proyectos del registry
 
-USO:
-  cd "/Users/jcvs/Desktop/KORA AM/dashboards"
-  /opt/homebrew/bin/python3.11 dashboard_server.py
-
-  Opciones de entorno:
-    DATA_SOURCE=supabase|sheets|static   (default: sheets)
-    PORT=5002
-    PRY002_SHEET_ID=<id del sheet PRY-002>
+Entorno:
+  REGISTRY_SHEET_ID  — Sheet que contiene la tab REGISTRY
+  SA_JSON_B64        — Service Account en base64 (para Render/cloud)
+  SA_FILE            — Ruta local al SA JSON (para desarrollo)
+  PORT               — Puerto (default 5002)
 """
 
-import os
-import sys
-import json
-import base64
-import tempfile
+import os, sys, json, base64, tempfile, time, concurrent.futures
 from datetime import datetime, date
-
-from flask import Flask, jsonify, send_from_directory
+from flask import Flask, jsonify, send_from_directory, request
 from flask_cors import CORS
 
-# ── SA JSON — soporta archivo local o variable de entorno (Render/cloud) ──────
+# ── SA JSON ────────────────────────────────────────────────────────────────────
 def _resolve_sa_file():
     sa_b64 = os.getenv('SA_JSON_B64', '')
     if sa_b64:
@@ -38,481 +31,43 @@ def _resolve_sa_file():
             return tmp.name
         except Exception as e:
             print(f'  ⚠ Error decodificando SA_JSON_B64: {e}')
-    # Ruta local como fallback
     return os.getenv('SA_FILE', '/Users/jcvs/Desktop/kora-am-platform/secrets/kora-service-account.json')
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-PORT         = int(os.getenv('PORT', 5002))
-DATA_SOURCE  = os.getenv('DATA_SOURCE', 'sheets')
-SHEET_ID     = os.getenv('PRY002_SHEET_ID', '')
-SA_FILE      = _resolve_sa_file()
-SUPABASE_ENV = os.getenv('SUPABASE_ENV', '/Users/jcvs/Desktop/kora-am-platform/.env.local')
-PROJECT_ID   = 'PRY-002'
+PORT             = int(os.getenv('PORT', 5002))
+SA_FILE          = _resolve_sa_file()
+# REGISTRY_SHEET_ID: si no se pasa, usa PRY002_SHEET_ID como fallback
+REGISTRY_SHEET_ID = os.getenv('REGISTRY_SHEET_ID') or os.getenv('PRY002_SHEET_ID', '')
 
 DASHBOARD_DIR = os.path.dirname(os.path.abspath(__file__))
-
 app = Flask(__name__, static_folder=DASHBOARD_DIR)
 CORS(app)
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+print(f'''
+══ KORA AM Dashboard Server (Multi-Proyecto) ══
+   Puerto:    http://localhost:{PORT}
+   SA File:   {SA_FILE}
+   Registry:  {REGISTRY_SHEET_ID or "⚠ NO CONFIGURADO"}
+''')
 
-def load_supabase_env():
-    """Carga variables de .env.local sin dotenv."""
-    env = {}
-    try:
-        with open(SUPABASE_ENV) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    k, v = line.split('=', 1)
-                    env[k.strip()] = v.strip()
-    except Exception:
-        pass
-    return env
-
-
+# ── Helpers numéricos ──────────────────────────────────────────────────────────
 def parse_num(val, default=0.0):
-    """Convierte valor de gspread a float, manejando formatos europeos y fechas."""
-    if val is None or val == '':
-        return default
-    if isinstance(val, (int, float)):
-        return float(val)
+    if val is None or val == '': return default
+    if isinstance(val, (int, float)): return float(val)
     if isinstance(val, str):
-        # Fecha auto-formateada por GSheets (e.g. '7074-08-22', '2026-10-05')
-        if len(val) == 10 and val[4] == '-' and val[7] == '-':
-            return default
-        # Formato europeo con puntos como miles: '1.890.000' → 1890000
-        # Formato con comas: '1,890,000' → 1890000
-        clean = val.replace('$', '').replace('%', '').replace(' ', '')
-        # Si tiene más de un punto, tratar los puntos como separadores de miles
-        if clean.count('.') > 1:
-            clean = clean.replace('.', '')
-        # Coma como separador de miles (no decimal)
+        if len(val) == 10 and val[4] == '-' and val[7] == '-': return default
+        clean = val.replace('$','').replace('%','').replace(' ','')
+        if clean.count('.') > 1:    clean = clean.replace('.','')
         elif clean.count(',') > 1 or (clean.count(',') == 1 and len(clean.split(',')[1]) == 3):
-            clean = clean.replace(',', '')
-        else:
-            clean = clean.replace(',', '.')
-        try:
-            return float(clean)
-        except Exception:
-            return default
+            clean = clean.replace(',','')
+        else: clean = clean.replace(',','.')
+        try: return float(clean)
+        except: return default
     return default
 
-
 def fmt_mxn(val):
-    """Formatea número como string MXN para el JSON."""
-    try:
-        return round(parse_num(val), 2)
-    except Exception:
-        return 0.0
-
-
-# ── Data loaders ───────────────────────────────────────────────────────────────
-
-def load_from_supabase():
-    """Lee kora_finance_mart.fct_project_summary y marts relacionados."""
-    try:
-        import psycopg2
-        import psycopg2.extras
-    except ImportError:
-        install('psycopg2-binary')
-        import psycopg2
-        import psycopg2.extras
-
-    env = load_supabase_env()
-    # La contraseña viene del env
-    pw = os.getenv('SUPABASE_PASSWORD') or env.get('SUPABASE_PASSWORD', '')
-
-    conn = psycopg2.connect(
-        host=env.get('SUPABASE_HOST', ''),
-        port=int(env.get('SUPABASE_PORT', 5432)),
-        dbname=env.get('SUPABASE_DB', 'postgres'),
-        user=env.get('SUPABASE_USER', 'postgres'),
-        password=pw,
-        sslmode='require',
-        connect_timeout=8,
-    )
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-
-    # Resumen financiero
-    cur.execute(f"""
-        SELECT * FROM kora_finance_mart.fct_project_summary
-        WHERE project_id = %s
-    """, (PROJECT_ID,))
-    summary = dict(cur.fetchone() or {})
-
-    # Ventas por mes
-    cur.execute(f"""
-        SELECT mes, ventas_firmadas, revenue_firmado, cobrado_total,
-               presupuesto_mes, costo_ejecutado_mes, flujo_neto_mes
-        FROM kora_ops_mart.fct_sales_by_month
-        WHERE project_id = %s
-        ORDER BY mes
-    """, (PROJECT_ID,))
-    by_month = [dict(r) for r in cur.fetchall()]
-
-    # LP Waterfall
-    cur.execute(f"""
-        SELECT tranche, capital_aportado, target_payout, yield_target,
-               capital_retornado, yield_retornado, total_retornado,
-               pendiente_pagar, pct_completado
-        FROM kora_investor_mart.fct_lp_waterfall
-        WHERE project_id = %s
-        ORDER BY tranche
-    """, (PROJECT_ID,))
-    waterfall = [dict(r) for r in cur.fetchall()]
-
-    cur.close()
-    conn.close()
-
-    return build_payload(summary, by_month, waterfall, source='supabase')
-
-
-def load_from_sheets():
-    """Lee el Google Sheet PRY-002 directamente."""
-    try:
-        import gspread
-        from google.oauth2.service_account import Credentials
-    except ImportError:
-        install('gspread'); install('google-auth')
-        import gspread
-        from google.oauth2.service_account import Credentials
-
-    sheet_id = SHEET_ID or os.getenv('PRY002_SHEET_ID', '')
-    if not sheet_id:
-        print('  ⚠ PRY002_SHEET_ID no definido — usando datos estáticos')
-        return load_static()
-
-    scopes = ['https://www.googleapis.com/auth/spreadsheets.readonly',
-              'https://www.googleapis.com/auth/drive.readonly']
-    creds = Credentials.from_service_account_file(SA_FILE, scopes=scopes)
-    gc = gspread.authorize(creds)
-    ss = gc.open_by_key(sheet_id)
-
-    def tab(name):
-        try:
-            # UNFORMATTED_VALUE devuelve números como números, evita bugs de formato %/europeo
-            return ss.worksheet(name).get_all_records(
-                value_render_option='UNFORMATTED_VALUE'
-            )
-        except Exception:
-            return []
-
-    config_rows   = tab('CONFIG')
-    premisas_rows = tab('PREMISAS')
-    ventas_rows   = tab('VENTAS')
-    gastos_rows   = tab('GASTOS')
-    cobranza_rows = tab('COBRANZA')
-    capital_rows  = tab('CAPITAL_CALLS')
-    hitos_rows    = tab('HITOS')
-    avance_rows   = tab('AVANCE_OBRA')
-    ppto_rows     = tab('PRESUPUESTO')
-    deuda_rows    = tab('DEUDA')
-
-    # ── Premisas dict ──────────────────────────────────────────────────────────
-    prem = {r['Campo']: r['Valor'] for r in premisas_rows if r.get('Campo')}
-
-    def p(key, default=0):
-        try:
-            return float(prem.get(key, default))
-        except Exception:
-            return default
-
-    revenue_total   = p('revenue_total',   96_600_000)
-    ppto_total      = p('ppto_total',      74_163_510)
-    lp_equity       = p('lp_equity',       35_500_000)
-    lp_multiple     = p('lp_multiple',     1.5)
-    lp_payout       = p('lp_payout',       53_250_000)
-    gp_promote      = p('gp_promote',       4_686_490)
-    total_unidades  = int(p('total_unidades', 15))
-
-    # ── Ventas ─────────────────────────────────────────────────────────────────
-    ventas_firmadas = [v for v in ventas_rows if str(v.get('status','')).lower() == 'firmado']
-    revenue_firmado = sum(parse_num(v.get('precio_lista', 0)) for v in ventas_firmadas)
-    cobranza_total  = sum(parse_num(c.get('monto', 0)) for c in cobranza_rows)
-
-    # ── Gastos ─────────────────────────────────────────────────────────────────
-    costo_ejecutado = sum(parse_num(g.get('pagado', 0)) for g in gastos_rows)
-
-    # ── Capital LP ─────────────────────────────────────────────────────────────
-    lp_recibido = sum(parse_num(k.get('monto', 0)) for k in capital_rows
-                      if str(k.get('status', '')).lower() == 'recibido')
-
-    # ── Ventas por mes (M0-M36) ────────────────────────────────────────────────
-    by_month_dict = {m: {'mes': m, 'ventas_firmadas': 0, 'revenue_firmado': 0.0,
-                          'cobrado_total': 0.0, 'costo_ejecutado_mes': 0.0}
-                     for m in range(37)}
-
-    for v in ventas_firmadas:
-        m = int(v.get('mes', 0))
-        if 0 <= m <= 36:
-            by_month_dict[m]['ventas_firmadas']  += 1
-            by_month_dict[m]['revenue_firmado']  += parse_num(v.get('precio_lista', 0))
-
-    for c in cobranza_rows:
-        m = int(c.get('mes', 0))
-        if 0 <= m <= 36:
-            by_month_dict[m]['cobrado_total'] += parse_num(c.get('monto', 0))
-
-    for g in gastos_rows:
-        m = int(g.get('mes', 0))
-        if 0 <= m <= 36:
-            by_month_dict[m]['costo_ejecutado_mes'] += parse_num(g.get('pagado', 0))
-
-    by_month = [by_month_dict[m] for m in range(37)]
-
-    # ── LP Waterfall ──────────────────────────────────────────────────────────
-    waterfall = []
-    for k in capital_rows:
-        aportado = parse_num(k.get('monto', 0))
-        waterfall.append({
-            'tranche':          k.get('tranche', ''),
-            'capital_aportado': aportado,
-            'target_payout':    aportado * lp_multiple,
-            'yield_target':     aportado * (lp_multiple - 1),
-            'capital_retornado': 0,
-            'yield_retornado':   0,
-            'total_retornado':   0,
-            'pendiente_pagar':   aportado * lp_multiple,
-            'pct_completado':    0.0,
-        })
-
-    # ── Avance obra ────────────────────────────────────────────────────────────
-    avance = [{'mes': a.get('mes', 0), 'label': a.get('label', ''),
-               'pct_avance': float(a.get('pct_avance', 0)),
-               'pct_objetivo': float(a.get('pct_objetivo', 0)),
-               'actividad': a.get('actividad', '')}
-              for a in avance_rows]
-
-    # ── Hitos ─────────────────────────────────────────────────────────────────
-    hitos = [{'mes': h.get('mes', 0), 'hito': h.get('hito', ''),
-              'status': h.get('status', ''), 'fecha_objetivo': h.get('fecha_objetivo', '')}
-             for h in hitos_rows]
-
-    summary = {
-        'project_id':          PROJECT_ID,
-        'project_name':        'Mártires 122',
-        'status':              'construction',
-        'total_units':         total_unidades,
-        'revenue_proforma':    revenue_total,
-        'ppto_proforma':       ppto_total,
-        'lp_equity':           lp_equity,
-        'lp_multiple':         lp_multiple,
-        'lp_payout_target':    lp_payout,
-        'gp_promote_est':      gp_promote,
-        'margen_bruto_proforma': revenue_total - ppto_total,
-        'unidades_firmadas':   len(ventas_firmadas),
-        'revenue_firmado':     revenue_firmado,
-        'pct_revenue_firmado': revenue_firmado / revenue_total if revenue_total else 0,
-        'pct_absorcion':       len(ventas_firmadas) / total_unidades if total_unidades else 0,
-        'costo_ejecutado':     costo_ejecutado,
-        'pct_presupuesto_ejecutado': costo_ejecutado / ppto_total if ppto_total else 0,
-        'cobranza_total':      cobranza_total,
-        'lp_equity_recibido':  lp_recibido,
-        'avance':              avance,
-        'hitos':               hitos,
-    }
-
-    bva = compute_bva(ppto_rows, gastos_rows, ventas_rows, cobranza_rows, avance_rows, prem)
-
-    return build_payload(summary, by_month, waterfall, source='sheets',
-                         detail_capital=capital_rows,
-                         detail_ventas=ventas_rows,
-                         detail_cobranza=cobranza_rows,
-                         detail_gastos=gastos_rows,
-                         detail_presupuesto=ppto_rows,
-                         detail_hitos=hitos_rows,
-                         detail_avance=avance_rows,
-                         detail_deuda=deuda_rows,
-                         bva=bva)
-
-
-def load_static():
-    """Datos estáticos de la proforma — fallback sin conexión."""
-    summary = {
-        'project_id':          PROJECT_ID,
-        'project_name':        'Mártires 122',
-        'status':              'construction',
-        'total_units':         15,
-        'revenue_proforma':    96_600_000,
-        'ppto_proforma':       74_163_510,
-        'lp_equity':           35_500_000,
-        'lp_multiple':         1.5,
-        'lp_payout_target':    53_250_000,
-        'gp_promote_est':       4_686_490,
-        'margen_bruto_proforma': 22_436_490,
-        'unidades_firmadas':   2,
-        'revenue_firmado':     12_600_000,
-        'pct_revenue_firmado': 0.130,
-        'pct_absorcion':       0.133,
-        'costo_ejecutado':     11_971_395,
-        'pct_presupuesto_ejecutado': 0.161,
-        'cobranza_total':       3_780_000,
-        'lp_equity_recibido':  35_500_000,
-        'avance': [
-            {'mes': 0,  'label': 'Abr-26', 'pct_avance': 0,  'pct_objetivo': 0,  'actividad': 'Inicio'},
-            {'mes': 1,  'label': 'May-26', 'pct_avance': 3,  'pct_objetivo': 3,  'actividad': 'Excavación'},
-            {'mes': 2,  'label': 'Jun-26', 'pct_avance': 8,  'pct_objetivo': 8,  'actividad': 'Cimentación'},
-            {'mes': 3,  'label': 'Jul-26', 'pct_avance': 13, 'pct_objetivo': 13, 'actividad': 'Estructura P1'},
-            {'mes': 4,  'label': 'Ago-26', 'pct_avance': 18, 'pct_objetivo': 18, 'actividad': 'Estructura P2'},
-            {'mes': 5,  'label': 'Sep-26', 'pct_avance': 23, 'pct_objetivo': 23, 'actividad': 'Estructura P3'},
-            {'mes': 6,  'label': 'Oct-26', 'pct_avance': 28, 'pct_objetivo': 28, 'actividad': 'Ventas abiertas'},
-            {'mes': 7,  'label': 'Nov-26', 'pct_avance': 33, 'pct_objetivo': 33, 'actividad': 'Estructura P5'},
-            {'mes': 8,  'label': 'Dic-26', 'pct_avance': 38, 'pct_objetivo': 38, 'actividad': 'Muros fachada'},
-            {'mes': 9,  'label': 'Ene-27', 'pct_avance': 44, 'pct_objetivo': 44, 'actividad': 'Instalaciones'},
-            {'mes': 10, 'label': 'Feb-27', 'pct_avance': 50, 'pct_objetivo': 50, 'actividad': 'Instalaciones'},
-            {'mes': 11, 'label': 'Mar-27', 'pct_avance': 55, 'pct_objetivo': 55, 'actividad': 'Muros interiores'},
-            {'mes': 12, 'label': 'Abr-27', 'pct_avance': 60, 'pct_objetivo': 60, 'actividad': 'Obra gris'},
-        ],
-        'hitos': [
-            {'mes': 0,  'hito': 'Inicio de obra',      'status': 'Completado', 'fecha_objetivo': '2026-04-01'},
-            {'mes': 0,  'hito': 'Tranche A LP',         'status': 'Completado', 'fecha_objetivo': '2026-04-01'},
-            {'mes': 2,  'hito': 'Cimentación OK',       'status': 'Completado', 'fecha_objetivo': '2026-06-01'},
-            {'mes': 2,  'hito': 'Tranche B LP',         'status': 'Completado', 'fecha_objetivo': '2026-06-01'},
-            {'mes': 5,  'hito': 'Tranche C LP',         'status': 'Completado', 'fecha_objetivo': '2026-09-01'},
-            {'mes': 6,  'hito': 'Apertura de ventas',   'status': 'Completado', 'fecha_objetivo': '2026-10-01'},
-            {'mes': 12, 'hito': 'Obra gris terminada',  'status': 'Pendiente',  'fecha_objetivo': '2027-04-01'},
-            {'mes': 24, 'hito': 'Entrega de llaves',    'status': 'Pendiente',  'fecha_objetivo': '2028-04-01'},
-            {'mes': 36, 'hito': 'Cierre del proyecto',  'status': 'Pendiente',  'fecha_objetivo': '2029-04-01'},
-        ],
-    }
-
-    # Cashflow proforma simplificado (ventas y costos por mes)
-    by_month = []
-    for m in range(37):
-        vf  = 12_600_000 if m == 6 else (9_450_000 if 7 <= m <= 8 else 0)
-        cob = 3_780_000  if m == 6 else 0
-        cos = {0: 9_040_000, 1: 1_598_062, 2: 1_473_062, 3: 3_986_254,
-               4: 2_652_921, 5: 3_986_254, 6: 2_652_921, 7: 3_986_254,
-               8: 2_652_921, 9: 3_986_254, 10: 2_652_921, 11: 3_986_254,
-               12: 2_652_921}.get(m, 1_200_000 if 13 <= m <= 24 else 0)
-        by_month.append({'mes': m, 'ventas_firmadas': 2 if m == 6 else 0,
-                          'revenue_firmado': vf, 'cobrado_total': cob,
-                          'costo_ejecutado_mes': cos,
-                          'flujo_neto_mes': cob - cos})
-
-    waterfall = [
-        {'tranche': 'A', 'capital_aportado': 20_000_000, 'target_payout': 30_000_000,
-         'yield_target': 10_000_000, 'capital_retornado': 0, 'yield_retornado': 0,
-         'total_retornado': 0, 'pendiente_pagar': 30_000_000, 'pct_completado': 0.0},
-        {'tranche': 'B', 'capital_aportado': 10_000_000, 'target_payout': 15_000_000,
-         'yield_target': 5_000_000, 'capital_retornado': 0, 'yield_retornado': 0,
-         'total_retornado': 0, 'pendiente_pagar': 15_000_000, 'pct_completado': 0.0},
-        {'tranche': 'C', 'capital_aportado':  5_500_000, 'target_payout':  8_250_000,
-         'yield_target': 2_750_000, 'capital_retornado': 0, 'yield_retornado': 0,
-         'total_retornado': 0, 'pendiente_pagar':  8_250_000, 'pct_completado': 0.0},
-    ]
-
-    return build_payload(summary, by_month, waterfall, source='static')
-
-
-def compute_bva(ppto_rows, gastos_rows, ventas_rows, cobranza_rows, avance_rows, prem):
-    """Calcula la comparativa Modelo vs Real para el tab BVA."""
-
-    # ── Costos por categoría ────────────────────────────────────────────────────
-    modelo_cat = {}
-    for r in ppto_rows:
-        cat = r.get('categoria', 'Sin categoría')
-        modelo_cat[cat] = modelo_cat.get(cat, 0) + parse_num(r.get('presupuestado', 0))
-
-    real_cat = {}
-    for r in gastos_rows:
-        cat = r.get('categoria', 'Sin categoría')
-        real_cat[cat] = real_cat.get(cat, 0) + parse_num(r.get('pagado', 0))
-
-    all_cats = sorted(set(list(modelo_cat.keys()) + list(real_cat.keys())),
-                      key=lambda c: -modelo_cat.get(c, 0))
-    costos = []
-    for cat in all_cats:
-        m = modelo_cat.get(cat, 0)
-        r = real_cat.get(cat, 0)
-        varianza = r - m   # positivo = sobre presupuesto (malo)
-        pct = round(r / m * 100, 1) if m else 0
-        costos.append({'categoria': cat, 'modelo': m, 'real': r,
-                       'varianza': varianza, 'pct_ejecucion': pct})
-
-    total_modelo_costo = sum(modelo_cat.values())
-    total_real_costo   = sum(real_cat.values())
-
-    # ── Ingresos (ventas) ───────────────────────────────────────────────────────
-    revenue_modelo  = parse_num(prem.get('revenue_total', 96_600_000))
-    total_unidades  = int(parse_num(prem.get('total_unidades', 15)))
-    enganche_pct    = parse_num(prem.get('enganche_pct', 0.3))
-
-    firmadas = [v for v in ventas_rows if str(v.get('status', '')).lower() == 'firmado']
-    revenue_real    = sum(parse_num(v.get('precio_lista', 0)) for v in firmadas)
-    unidades_real   = len(firmadas)
-
-    # ── Cobranza ────────────────────────────────────────────────────────────────
-    enganche_esperado = sum(parse_num(v.get('enganche', 0)) for v in firmadas)
-    cobrado_total     = sum(parse_num(c.get('monto', 0)) for c in cobranza_rows
-                            if str(c.get('status', '')).lower() == 'recibido')
-    tasa_cobro = round(cobrado_total / enganche_esperado * 100, 1) if enganche_esperado else 0
-
-    # Desglose cobranza por unidad
-    cobrado_x_unidad = {}
-    for c in cobranza_rows:
-        uid = c.get('unidad_id', '?')
-        cobrado_x_unidad[uid] = cobrado_x_unidad.get(uid, 0) + parse_num(c.get('monto', 0))
-
-    cobranza_detalle = []
-    for v in firmadas:
-        uid = v.get('unidad_id', '?')
-        esp = parse_num(v.get('enganche', 0))
-        cob = cobrado_x_unidad.get(uid, 0)
-        cobranza_detalle.append({
-            'unidad_id': uid, 'comprador': v.get('comprador', '—'),
-            'esperado': esp, 'cobrado': cob,
-            'pendiente': esp - cob,
-            'tasa': round(cob / esp * 100, 1) if esp else 0,
-        })
-
-    # ── Avance obra ─────────────────────────────────────────────────────────────
-    avance_bva = []
-    for a in avance_rows:
-        obj  = parse_num(a.get('pct_objetivo', 0))
-        real = parse_num(a.get('pct_avance', 0))
-        avance_bva.append({
-            'mes':       a.get('mes', 0),
-            'actividad': a.get('actividad', ''),
-            'objetivo':  obj,
-            'real':      real,
-            'delta':     round(real - obj, 1),
-        })
-
-    # ── Margen estimado ─────────────────────────────────────────────────────────
-    margen_modelo = parse_num(prem.get('margen_bruto', revenue_modelo - total_modelo_costo))
-    margen_real   = revenue_real - total_real_costo
-    pct_margen_modelo = round(margen_modelo / revenue_modelo * 100, 1) if revenue_modelo else 0
-    pct_margen_real   = round(margen_real / revenue_real * 100, 1) if revenue_real else 0
-
-    return {
-        'costos': costos,
-        'costos_total': {
-            'modelo': total_modelo_costo, 'real': total_real_costo,
-            'varianza': total_real_costo - total_modelo_costo,
-            'pct_ejecucion': round(total_real_costo / total_modelo_costo * 100, 1) if total_modelo_costo else 0,
-        },
-        'ingresos': {
-            'revenue_modelo': revenue_modelo, 'revenue_real': revenue_real,
-            'varianza': revenue_real - revenue_modelo,
-            'pct_avance': round(revenue_real / revenue_modelo * 100, 1) if revenue_modelo else 0,
-            'unidades_modelo': total_unidades, 'unidades_real': unidades_real,
-            'pct_unidades': round(unidades_real / total_unidades * 100, 1) if total_unidades else 0,
-        },
-        'cobranza': {
-            'esperado': enganche_esperado, 'cobrado': cobrado_total,
-            'pendiente': enganche_esperado - cobrado_total,
-            'tasa_cobro': tasa_cobro,
-            'detalle': cobranza_detalle,
-        },
-        'avance': avance_bva,
-        'margen': {
-            'modelo': margen_modelo, 'real': margen_real,
-            'pct_modelo': pct_margen_modelo, 'pct_real': pct_margen_real,
-        },
-    }
-
+    try: return round(float(val), 2)
+    except: return 0.0
 
 _NUMERIC_KEYS = {
     'monto','precio_lista','enganche','diferido','residual','presupuestado','pagado',
@@ -522,205 +77,426 @@ _NUMERIC_KEYS = {
 }
 
 def sanitize_rows(rows):
-    """Convierte valores de gspread a tipos básicos JSON-serializables.
-    Para campos numéricos conocidos, aplica parse_num para manejar formatos europeos."""
     clean = []
     for row in rows:
         r = {}
         for k, v in row.items():
-            if k in _NUMERIC_KEYS:
-                r[k] = parse_num(v)
-            elif isinstance(v, (int, float, bool, type(None))):
-                r[k] = v
-            elif isinstance(v, str):
-                r[k] = v
-            else:
-                r[k] = str(v)
+            if k in _NUMERIC_KEYS: r[k] = parse_num(v)
+            elif isinstance(v, (int, float, bool, type(None))): r[k] = v
+            else: r[k] = str(v) if not isinstance(v, str) else v
         clean.append(r)
     return clean
 
+# ── Google Sheets client ───────────────────────────────────────────────────────
+_gc = None
+def get_gc():
+    global _gc
+    if _gc is None:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        scopes = ['https://www.googleapis.com/auth/spreadsheets',
+                  'https://www.googleapis.com/auth/drive']
+        creds = Credentials.from_service_account_file(SA_FILE, scopes=scopes)
+        _gc = gspread.authorize(creds)
+    return _gc
 
-def build_payload(summary, by_month, waterfall, source='static',
-                  detail_capital=None, detail_ventas=None, detail_cobranza=None,
-                  detail_gastos=None, detail_presupuesto=None, detail_hitos=None,
-                  detail_avance=None, detail_deuda=None, bva=None):
-    """Construye el JSON final que consume el dashboard."""
-    # Mes actual del proyecto (M0 = Abr-2026)
-    proyecto_start = date(2026, 4, 1)
-    today = date.today()
-    delta = (today.year - proyecto_start.year) * 12 + (today.month - proyecto_start.month)
-    mes_actual = max(0, min(36, delta))
+def open_sheet(sheet_id):
+    return get_gc().open_by_key(sheet_id)
 
-    labels = []
+def tab(ws_or_sh, name):
+    """Lee un tab de un spreadsheet como lista de dicts."""
+    try:
+        if hasattr(ws_or_sh, 'worksheet'):
+            return ws_or_sh.worksheet(name).get_all_records(value_render_option='UNFORMATTED_VALUE')
+        return ws_or_sh.get_all_records(value_render_option='UNFORMATTED_VALUE')
+    except Exception:
+        return []
+
+# ── Registry ───────────────────────────────────────────────────────────────────
+def load_registry():
+    """Lee el tab REGISTRY y retorna lista de proyectos."""
+    if not REGISTRY_SHEET_ID:
+        return []
+    try:
+        sh = open_sheet(REGISTRY_SHEET_ID)
+        rows = tab(sh, 'REGISTRY')
+        return [r for r in rows if r.get('proyecto_id') and r.get('sheet_id')]
+    except Exception as e:
+        print(f'  ⚠ Error leyendo registry: {e}')
+        return []
+
+# ── BVA ────────────────────────────────────────────────────────────────────────
+def compute_bva(ppto_rows, gastos_rows, ventas_rows, cobranza_rows, avance_rows, prem):
+    modelo_cat, real_cat = {}, {}
+    for r in ppto_rows:
+        c = r.get('categoria','Sin categoría')
+        modelo_cat[c] = modelo_cat.get(c,0) + parse_num(r.get('presupuestado',0))
+    for r in gastos_rows:
+        c = r.get('categoria','Sin categoría')
+        real_cat[c] = real_cat.get(c,0) + parse_num(r.get('pagado',0))
+
+    all_cats = sorted(set(list(modelo_cat)+list(real_cat)), key=lambda c:-modelo_cat.get(c,0))
+    costos = []
+    for c in all_cats:
+        m, r = modelo_cat.get(c,0), real_cat.get(c,0)
+        costos.append({'categoria':c,'modelo':m,'real':r,
+                       'varianza':r-m,'pct_ejecucion':round(r/m*100,1) if m else 0})
+    tm, tr = sum(modelo_cat.values()), sum(real_cat.values())
+
+    rev_mod = parse_num(prem.get('revenue_total', 96_600_000))
+    tot_uni = int(parse_num(prem.get('total_unidades', 15)))
+    firmadas = [v for v in ventas_rows if str(v.get('status','')).lower()=='firmado']
+    rev_real = sum(parse_num(v.get('precio_lista',0)) for v in firmadas)
+
+    enganche_esp = sum(parse_num(v.get('enganche',0)) for v in firmadas)
+    cobrado = sum(parse_num(c.get('monto',0)) for c in cobranza_rows
+                  if str(c.get('status','')).lower()=='recibido')
+    cobrado_x_u = {}
+    for c in cobranza_rows:
+        u = c.get('unidad_id','?')
+        cobrado_x_u[u] = cobrado_x_u.get(u,0) + parse_num(c.get('monto',0))
+    cobr_det = [{'unidad_id':v.get('unidad_id'),'comprador':v.get('comprador','—'),
+                 'esperado':parse_num(v.get('enganche',0)),
+                 'cobrado':cobrado_x_u.get(v.get('unidad_id','?'),0),
+                 'pendiente':parse_num(v.get('enganche',0))-cobrado_x_u.get(v.get('unidad_id','?'),0),
+                 'tasa':round(cobrado_x_u.get(v.get('unidad_id','?'),0)/parse_num(v.get('enganche',0))*100,1)
+                       if parse_num(v.get('enganche',0)) else 0}
+                for v in firmadas]
+
+    av_bva = [{'mes':a.get('mes',0),'actividad':a.get('actividad',''),
+               'objetivo':parse_num(a.get('pct_objetivo',0)),
+               'real':parse_num(a.get('pct_avance',0)),
+               'delta':round(parse_num(a.get('pct_avance',0))-parse_num(a.get('pct_objetivo',0)),1)}
+              for a in avance_rows]
+
+    margen_mod = parse_num(prem.get('margen_bruto', rev_mod-tm))
+    margen_real = rev_real - tr
+    return {
+        'costos': costos,
+        'costos_total': {'modelo':tm,'real':tr,'varianza':tr-tm,
+                         'pct_ejecucion':round(tr/tm*100,1) if tm else 0},
+        'ingresos': {'revenue_modelo':rev_mod,'revenue_real':rev_real,
+                     'varianza':rev_real-rev_mod,
+                     'pct_avance':round(rev_real/rev_mod*100,1) if rev_mod else 0,
+                     'unidades_modelo':tot_uni,'unidades_real':len(firmadas),
+                     'pct_unidades':round(len(firmadas)/tot_uni*100,1) if tot_uni else 0},
+        'cobranza': {'esperado':enganche_esp,'cobrado':cobrado,'pendiente':enganche_esp-cobrado,
+                     'tasa_cobro':round(cobrado/enganche_esp*100,1) if enganche_esp else 0,
+                     'detalle':cobr_det},
+        'avance': av_bva,
+        'margen': {'modelo':margen_mod,'real':margen_real,
+                   'pct_modelo':round(margen_mod/rev_mod*100,1) if rev_mod else 0,
+                   'pct_real':round(margen_real/rev_real*100,1) if rev_real else 0},
+    }
+
+# ── Cargar un proyecto ─────────────────────────────────────────────────────────
+def load_project(meta):
+    """Carga todos los datos de un proyecto desde su Google Sheet."""
+    pid      = meta['proyecto_id']
+    nombre   = meta.get('nombre', pid)
+    sheet_id = meta['sheet_id']
+    fondo    = meta.get('fondo', '—')
+    ciudad   = meta.get('ciudad', '—')
+    tipo     = meta.get('tipo_activo', '—')
+    moneda   = meta.get('moneda', 'MXN')
+
+    try:
+        sh = open_sheet(sheet_id)
+        prem_rows   = tab(sh, 'PREMISAS')
+        ventas_rows = tab(sh, 'VENTAS')
+        gastos_rows = tab(sh, 'GASTOS')
+        cobr_rows   = tab(sh, 'COBRANZA')
+        cap_rows    = tab(sh, 'CAPITAL_CALLS')
+        hitos_rows  = tab(sh, 'HITOS')
+        avance_rows = tab(sh, 'AVANCE_OBRA')
+        ppto_rows   = tab(sh, 'PRESUPUESTO')
+        deuda_rows  = tab(sh, 'DEUDA')
+        source = 'sheets'
+    except Exception as e:
+        print(f'  ⚠ Error cargando {pid}: {e}')
+        prem_rows=ventas_rows=gastos_rows=cobr_rows=cap_rows=[]
+        hitos_rows=avance_rows=ppto_rows=deuda_rows=[]
+        source = 'error'
+
+    prem = {r['Campo']: r['Valor'] for r in prem_rows if r.get('Campo')}
+    def p(k, d=0):
+        try: return float(prem.get(k, d))
+        except: return d
+
+    rev_total   = p('revenue_total',  96_600_000)
+    ppto_total  = p('ppto_total',     74_163_510)
+    lp_equity   = p('lp_equity',      35_500_000)
+    lp_multiple = p('lp_multiple',    1.5)
+    lp_payout   = p('lp_payout',      lp_equity * lp_multiple)
+    gp_promote  = p('gp_promote',      4_686_490)
+    tot_uni     = int(p('total_unidades', 15))
+
+    firmadas     = [v for v in ventas_rows if str(v.get('status','')).lower()=='firmado']
+    rev_firmado  = sum(parse_num(v.get('precio_lista',0)) for v in firmadas)
+    cobr_total   = sum(parse_num(c.get('monto',0)) for c in cobr_rows)
+    costo_ejec   = sum(parse_num(g.get('pagado',0)) for g in gastos_rows)
+    lp_recibido  = sum(parse_num(k.get('monto',0)) for k in cap_rows
+                       if str(k.get('status','')).lower()=='recibido')
+
+    avance_list = [{'mes':a.get('mes',0),'label':a.get('label',''),
+                    'pct_avance':float(a.get('pct_avance',0)),
+                    'pct_objetivo':float(a.get('pct_objetivo',0)),
+                    'actividad':a.get('actividad','')} for a in avance_rows]
+    avance_actual = next((a['pct_avance'] for a in reversed(avance_list) if a['pct_avance']>0), 0)
+
+    # Waterfall LP
+    cap_by_tranche = {}
+    for k in cap_rows:
+        t = k.get('tranche','?')
+        cap_by_tranche.setdefault(t,{'aportado':0,'target':0,'retornado':0})
+        cap_by_tranche[t]['aportado']  += parse_num(k.get('monto',0))
+        cap_by_tranche[t]['target']    += parse_num(k.get('target_payout',0)) or parse_num(k.get('monto',0))*lp_multiple
+        cap_by_tranche[t]['retornado'] += 0
+    waterfall = [{'tranche':t,'capital_aportado':v['aportado'],'target_payout':v['target'],
+                  'total_retornado':v['retornado'],
+                  'pendiente_pagar':v['target']-v['retornado'],
+                  'pct_completado':round(v['retornado']/v['target']*100,1) if v['target'] else 0}
+                 for t,v in sorted(cap_by_tranche.items())]
+
+    # BVA
+    bva = compute_bva(ppto_rows, gastos_rows, ventas_rows, cobr_rows, avance_rows, prem)
+
+    # Labels M0-M36
     inicio = date(2026, 4, 1)
+    labels = []
     for m in range(37):
-        yr  = inicio.year + (inicio.month + m - 1) // 12
-        mo  = (inicio.month + m - 1) % 12 + 1
+        yr = inicio.year + (inicio.month+m-1)//12
+        mo = (inicio.month+m-1)%12+1
         labels.append(f"{['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][mo-1]}-{str(yr)[2:]}")
 
-    # Cashflow acumulado proforma (desde datos estáticos del modelo)
-    cashflow_pf = [
-        -9_040_000, -1_598_062, -1_473_062, -2_652_921, -2_652_921, -3_986_254,
-         1_237_079,  -815_842,  -815_842,  -1_749_175, -1_749_175, -1_083_042,
-        -2_652_921,  -615_588,   -615_588,   -615_588,   -615_588,   -615_588,
-         -615_588,   1_584_412,  1_584_412,  1_584_412,  1_584_412,  1_584_412,
-         4_334_412,  1_584_412,  1_584_412,  1_584_412,  1_584_412,  1_584_412,
-         4_334_412,  1_584_412,  1_584_412,  4_984_412,  1_584_412,  1_584_412,
-        26_234_412,
-    ]
-
-    # Acumular
-    acum = []
-    s = 0
-    for v in cashflow_pf:
-        s += v
-        acum.append(round(s / 1e6, 2))
-
-    by_month_clean = []
-    for r in by_month:
-        m = int(r.get('mes', 0))
-        by_month_clean.append({
-            'mes':               m,
-            'label':             labels[m] if m < len(labels) else f'M{m}',
-            'ventas_firmadas':   int(r.get('ventas_firmadas', 0)),
-            'revenue_firmado':   fmt_mxn(r.get('revenue_firmado', 0)),
-            'cobrado_total':     fmt_mxn(r.get('cobrado_total', 0)),
-            'costo_ejecutado':   fmt_mxn(r.get('costo_ejecutado_mes', 0)),
-            'flujo_neto':        fmt_mxn(r.get('cobrado_total', 0)) - fmt_mxn(r.get('costo_ejecutado_mes', 0)),
-        })
-
-    waterfall_clean = []
-    for w in waterfall:
-        cap = fmt_mxn(w.get('capital_aportado', 0))
-        tgt = fmt_mxn(w.get('target_payout', cap * 1.5))
-        ret = fmt_mxn(w.get('total_retornado', 0))
-        pct = round(ret / tgt * 100, 1) if tgt > 0 else 0.0
-        waterfall_clean.append({
-            'tranche':          w.get('tranche', ''),
-            'capital_aportado': cap,
-            'target_payout':    tgt,
-            'total_retornado':  ret,
-            'pendiente_pagar':  fmt_mxn(w.get('pendiente_pagar', tgt - ret)),
-            'pct_completado':   pct,
-        })
+    proyecto_start = date(2026, 4, 1)
+    today = date.today()
+    delta = (today.year-proyecto_start.year)*12+(today.month-proyecto_start.month)
+    mes_actual = max(0, min(36, delta))
 
     return {
         'meta': {
-            'source':       source,
-            'project_id':   PROJECT_ID,
-            'project_name': summary.get('project_name', 'Mártires 122'),
-            'mes_actual':   mes_actual,
-            'label_actual': labels[mes_actual] if mes_actual < len(labels) else f'M{mes_actual}',
-            'updated_at':   datetime.now().isoformat(),
+            'proyecto_id':   pid,
+            'nombre':        nombre,
+            'sheet_id':      sheet_id,
+            'fondo':         fondo,
+            'tipo_activo':   tipo,
+            'ciudad':        ciudad,
+            'moneda':        moneda,
+            'status':        meta.get('status','—'),
+            'source':        source,
+            'mes_actual':    mes_actual,
+            'label_actual':  labels[mes_actual],
+            'updated_at':    datetime.now().isoformat(),
         },
         'kpis': {
-            'revenue_proforma':         fmt_mxn(summary.get('revenue_proforma', 96_600_000)),
-            'revenue_firmado':          fmt_mxn(summary.get('revenue_firmado', 0)),
-            'pct_revenue_firmado':      round(float(summary.get('pct_revenue_firmado', 0)) * 100, 1),
-            'ppto_proforma':            fmt_mxn(summary.get('ppto_proforma', 74_163_510)),
-            'costo_ejecutado':          fmt_mxn(summary.get('costo_ejecutado', 0)),
-            'pct_presupuesto_ejecutado': round(float(summary.get('pct_presupuesto_ejecutado', 0)) * 100, 1),
-            'cobranza_total':           fmt_mxn(summary.get('cobranza_total', 0)),
-            'margen_bruto_proforma':    fmt_mxn(summary.get('margen_bruto_proforma', 22_436_490)),
-            'total_units':              int(summary.get('total_units', 15)),
-            'unidades_firmadas':        int(summary.get('unidades_firmadas', 0)),
-            'pct_absorcion':            round(float(summary.get('pct_absorcion', 0)) * 100, 1),
-            'lp_equity':                fmt_mxn(summary.get('lp_equity', 35_500_000)),
-            'lp_equity_recibido':       fmt_mxn(summary.get('lp_equity_recibido', 0)),
-            'lp_payout_target':         fmt_mxn(summary.get('lp_payout_target', 53_250_000)),
-            'lp_multiple':              float(summary.get('lp_multiple', 1.5)),
-            'gp_promote_est':           fmt_mxn(summary.get('gp_promote_est', 4_686_490)),
+            'revenue_proforma':           fmt_mxn(rev_total),
+            'revenue_firmado':            fmt_mxn(rev_firmado),
+            'pct_revenue_firmado':        round(rev_firmado/rev_total*100,1) if rev_total else 0,
+            'ppto_proforma':              fmt_mxn(ppto_total),
+            'costo_ejecutado':            fmt_mxn(costo_ejec),
+            'pct_presupuesto_ejecutado':  round(costo_ejec/ppto_total*100,1) if ppto_total else 0,
+            'cobranza_total':             fmt_mxn(cobr_total),
+            'margen_bruto_proforma':      fmt_mxn(rev_total-ppto_total),
+            'total_units':                tot_uni,
+            'unidades_firmadas':          len(firmadas),
+            'pct_absorcion':              round(len(firmadas)/tot_uni*100,1) if tot_uni else 0,
+            'lp_equity':                  fmt_mxn(lp_equity),
+            'lp_equity_recibido':         fmt_mxn(lp_recibido),
+            'lp_payout_target':           fmt_mxn(lp_payout),
+            'lp_multiple':                lp_multiple,
+            'gp_promote_est':             fmt_mxn(gp_promote),
+            'avance_obra_pct':            avance_actual,
         },
-        'cashflow': {
-            'labels':     labels,
-            'proforma':   acum,
-        },
-        'by_month':  by_month_clean,
-        'waterfall': waterfall_clean,
-        'avance':    summary.get('avance', []),
-        'hitos':     summary.get('hitos', []),
+        'waterfall': waterfall,
+        'avance':    avance_list,
+        'hitos':     [{'mes':h.get('mes',0),'hito':h.get('hito',''),
+                       'status':h.get('status',''),'fecha_objetivo':h.get('fecha_objetivo','')}
+                      for h in hitos_rows],
         'detail': {
-            'capital_calls':  sanitize_rows(detail_capital or []),
-            'ventas':         sanitize_rows(detail_ventas or []),
-            'cobranza':       sanitize_rows(detail_cobranza or []),
-            'gastos':         sanitize_rows(detail_gastos or []),
-            'presupuesto':    sanitize_rows(detail_presupuesto or []),
-            'hitos':          sanitize_rows(detail_hitos or []),
-            'avance':         sanitize_rows(detail_avance or []),
-            'deuda':          sanitize_rows(detail_deuda or []),
+            'capital_calls': sanitize_rows(cap_rows),
+            'ventas':        sanitize_rows(ventas_rows),
+            'cobranza':      sanitize_rows(cobr_rows),
+            'gastos':        sanitize_rows(gastos_rows),
+            'presupuesto':   sanitize_rows(ppto_rows),
+            'hitos':         sanitize_rows(hitos_rows),
+            'avance':        sanitize_rows(avance_rows),
+            'deuda':         sanitize_rows(deuda_rows),
         },
-        'bva': bva or {},
+        'bva': bva,
     }
 
+# ── Portfolio consolidado ──────────────────────────────────────────────────────
+def build_portfolio(projects_data):
+    """Agrega todos los proyectos en una vista consolidada."""
+    if not projects_data:
+        return {'proyectos': [], 'kpis': {}, 'por_fondo': {}}
 
-# ── Cache simple (60 segundos) ─────────────────────────────────────────────────
-_cache = {'data': None, 'ts': 0}
-CACHE_TTL = 60  # segundos
+    total_rev_pf   = sum(p['kpis'].get('revenue_proforma',0)   for p in projects_data)
+    total_rev_real = sum(p['kpis'].get('revenue_firmado',0)     for p in projects_data)
+    total_costo_pf = sum(p['kpis'].get('ppto_proforma',0)       for p in projects_data)
+    total_costo_r  = sum(p['kpis'].get('costo_ejecutado',0)     for p in projects_data)
+    total_lp_eq    = sum(p['kpis'].get('lp_equity',0)           for p in projects_data)
+    total_lp_rec   = sum(p['kpis'].get('lp_equity_recibido',0)  for p in projects_data)
+    total_cobr     = sum(p['kpis'].get('cobranza_total',0)       for p in projects_data)
+    total_uni_pf   = sum(p['kpis'].get('total_units',0)          for p in projects_data)
+    total_uni_firm = sum(p['kpis'].get('unidades_firmadas',0)    for p in projects_data)
+    total_margen_m = sum(p['kpis'].get('margen_bruto_proforma',0) for p in projects_data)
 
-def get_data():
-    import time
-    now = time.time()
-    if _cache['data'] and (now - _cache['ts']) < CACHE_TTL:
-        return _cache['data']
+    # Resumen por fondo
+    por_fondo = {}
+    for p in projects_data:
+        f = p['meta'].get('fondo','Sin fondo')
+        if f not in por_fondo:
+            por_fondo[f] = {'proyectos':0,'revenue_pf':0,'revenue_real':0,
+                            'lp_equity':0,'costo_ejecutado':0}
+        por_fondo[f]['proyectos']      += 1
+        por_fondo[f]['revenue_pf']     += p['kpis'].get('revenue_proforma',0)
+        por_fondo[f]['revenue_real']   += p['kpis'].get('revenue_firmado',0)
+        por_fondo[f]['lp_equity']      += p['kpis'].get('lp_equity',0)
+        por_fondo[f]['costo_ejecutado']+= p['kpis'].get('costo_ejecutado',0)
 
-    print(f'[{datetime.now().strftime("%H:%M:%S")}] Cargando datos ({DATA_SOURCE})...')
-    try:
-        if DATA_SOURCE == 'supabase':
-            data = load_from_supabase()
-        elif DATA_SOURCE == 'sheets':
-            data = load_from_sheets()
-        else:
-            data = load_static()
-        _cache['data'] = data
-        _cache['ts']   = now
-        print(f'  ✅ Datos cargados. Fuente: {data["meta"]["source"]}')
-    except Exception as e:
-        print(f'  ⚠ Error cargando {DATA_SOURCE}: {e} — usando estáticos')
-        data = load_static()
-        _cache['data'] = data
-        _cache['ts']   = now
+    # Tabla de proyectos
+    proyectos_tabla = [{
+        'proyecto_id':    p['meta']['proyecto_id'],
+        'nombre':         p['meta']['nombre'],
+        'fondo':          p['meta']['fondo'],
+        'tipo_activo':    p['meta']['tipo_activo'],
+        'ciudad':         p['meta']['ciudad'],
+        'status':         p['meta']['status'],
+        'revenue_pf':     p['kpis'].get('revenue_proforma',0),
+        'revenue_real':   p['kpis'].get('revenue_firmado',0),
+        'pct_ventas':     p['kpis'].get('pct_revenue_firmado',0),
+        'unidades':       f"{p['kpis'].get('unidades_firmadas',0)}/{p['kpis'].get('total_units',0)}",
+        'pct_absorcion':  p['kpis'].get('pct_absorcion',0),
+        'costo_ejec':     p['kpis'].get('costo_ejecutado',0),
+        'pct_presup':     p['kpis'].get('pct_presupuesto_ejecutado',0),
+        'avance_obra':    p['kpis'].get('avance_obra_pct',0),
+        'lp_equity':      p['kpis'].get('lp_equity',0),
+        'lp_recibido':    p['kpis'].get('lp_equity_recibido',0),
+        'margen_pf':      p['kpis'].get('margen_bruto_proforma',0),
+        'moneda':         p['meta']['moneda'],
+    } for p in projects_data]
 
-    return data
+    return {
+        'kpis': {
+            'total_proyectos':      len(projects_data),
+            'revenue_proforma':     total_rev_pf,
+            'revenue_firmado':      total_rev_real,
+            'pct_revenue':          round(total_rev_real/total_rev_pf*100,1) if total_rev_pf else 0,
+            'ppto_total':           total_costo_pf,
+            'costo_ejecutado':      total_costo_r,
+            'pct_costos':           round(total_costo_r/total_costo_pf*100,1) if total_costo_pf else 0,
+            'lp_equity_total':      total_lp_eq,
+            'lp_equity_recibido':   total_lp_rec,
+            'pct_lp_recibido':      round(total_lp_rec/total_lp_eq*100,1) if total_lp_eq else 0,
+            'cobranza_total':       total_cobr,
+            'total_unidades_pf':    total_uni_pf,
+            'total_unidades_firm':  total_uni_firm,
+            'pct_absorcion':        round(total_uni_firm/total_uni_pf*100,1) if total_uni_pf else 0,
+            'margen_bruto_total':   total_margen_m,
+            'pct_margen':           round(total_margen_m/total_rev_pf*100,1) if total_rev_pf else 0,
+        },
+        'por_fondo':       por_fondo,
+        'proyectos':       proyectos_tabla,
+    }
 
+# ── Cache ──────────────────────────────────────────────────────────────────────
+_cache = {}         # { 'portfolio': {...,ts}, 'PRY-002': {...,ts}, ... }
+CACHE_TTL = 60
 
-# ── Rutas ──────────────────────────────────────────────────────────────────────
+def _is_fresh(key):
+    return key in _cache and (time.time() - _cache[key].get('_ts',0)) < CACHE_TTL
 
+def _store(key, data):
+    _cache[key] = {**data, '_ts': time.time()}
+
+# ── Carga completa del portfolio ───────────────────────────────────────────────
+def load_all():
+    """Carga registry + todos los proyectos. Usa caché si está fresco."""
+    if _is_fresh('_registry'):
+        registry = _cache['_registry']['data']
+    else:
+        registry = load_registry()
+        _cache['_registry'] = {'data': registry, '_ts': time.time()}
+
+    # Cargar proyectos en paralelo
+    def _load_one(meta):
+        pid = meta['proyecto_id']
+        if _is_fresh(pid):
+            return _cache[pid]['data']
+        data = load_project(meta)
+        _store(pid, {'data': data})
+        return data
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as ex:
+        projects_data = list(ex.map(_load_one, registry))
+
+    portfolio = build_portfolio(projects_data)
+    _store('portfolio', {'data': portfolio, 'projects': projects_data})
+    return portfolio, projects_data, registry
+
+# ── Rutas Flask ────────────────────────────────────────────────────────────────
 @app.route('/')
 def index():
     return send_from_directory(DASHBOARD_DIR, 'dashboard.html')
 
-
-@app.route('/api/data')
-def api_data():
-    data = get_data()
-    return jsonify(data)
-
-
 @app.route('/api/health')
 def health():
-    return jsonify({'status': 'ok', 'port': PORT, 'source': DATA_SOURCE,
-                    'project': PROJECT_ID, 'ts': datetime.now().isoformat()})
+    return jsonify({'status':'ok','port':PORT,'source':'sheets',
+                    'ts':datetime.now().isoformat(),'version':'multi-proyecto'})
 
+@app.route('/api/projects')
+def projects():
+    """Lista de proyectos del registry."""
+    try:
+        _, _, registry = load_all()
+        return jsonify(registry)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/portfolio')
+def portfolio():
+    """Consolidado de todos los proyectos."""
+    try:
+        port, _, _ = load_all()
+        return jsonify(port)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/proyecto/<proyecto_id>')
+def proyecto(proyecto_id):
+    """Datos completos de un proyecto específico."""
+    try:
+        _, projects_data, _ = load_all()
+        for p in projects_data:
+            if p['meta']['proyecto_id'] == proyecto_id:
+                return jsonify(p)
+        return jsonify({'error': f'Proyecto {proyecto_id} no encontrado'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/refresh', methods=['POST'])
 def refresh():
-    """Fuerza re-carga de datos."""
-    _cache['ts'] = 0
-    data = get_data()
-    return jsonify({'refreshed': True, 'source': data['meta']['source'],
-                    'updated_at': data['meta']['updated_at']})
+    """Invalida el cache completo y recarga todo."""
+    _cache.clear()
+    try:
+        load_all()
+        return jsonify({'ok': True, 'ts': datetime.now().isoformat()})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
+# Rutas legacy — compatibilidad con el frontend anterior
+@app.route('/api/data')
+def data_legacy():
+    """Ruta legacy → redirige al primer proyecto para compatibilidad."""
+    try:
+        _, projects_data, _ = load_all()
+        if projects_data:
+            return jsonify(projects_data[0])
+        return jsonify({'error': 'Sin proyectos en el registry'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    print(f'\n══ KORA AM Dashboard Server ══')
-    print(f'   Proyecto:   {PROJECT_ID} — Mártires 122')
-    print(f'   Puerto:     http://localhost:{PORT}')
-    print(f'   Data:       {DATA_SOURCE}')
-    print(f'   SA File:    {SA_FILE}')
-    if DATA_SOURCE == 'sheets' and not SHEET_ID:
-        print(f'   ⚠ Tip: exporta PRY002_SHEET_ID=<id> para conectar a Sheets')
-    print(f'   Dashboard:  http://localhost:{PORT}')
-    print(f'   API:        http://localhost:{PORT}/api/data\n')
     app.run(host='0.0.0.0', port=PORT, debug=False)

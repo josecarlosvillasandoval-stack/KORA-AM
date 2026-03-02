@@ -364,6 +364,59 @@ body {
   .content { padding: 16px; }
   .drawer { width: 100%; }
 }
+
+/* ── PROJECT NAV ─────────────────────────────────────────────── */
+.proj-nav {
+  background: #111; padding: 0 32px;
+  display: flex; align-items: center; gap: 2px;
+  overflow-x: auto; border-bottom: 1px solid #222;
+  position: sticky; top: 64px; z-index: 150;
+}
+.proj-btn {
+  flex-shrink: 0;
+  font-family: var(--font-head); font-size: 9px; font-weight: 600;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  padding: 11px 18px; cursor: pointer;
+  border: none; background: none; color: #555;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s; white-space: nowrap;
+}
+.proj-btn:hover { color: var(--bronze); }
+.proj-btn.active { color: var(--terra); border-bottom-color: var(--terra); }
+.proj-pill {
+  display: inline-block; background: #222; color: var(--bronze);
+  font-size: 8px; padding: 1px 6px; border-radius: 8px; margin-left: 5px;
+}
+.proj-btn.active .proj-pill { background: var(--terra); color: #fff; }
+
+/* ── PORTFOLIO VIEW ──────────────────────────────────────────── */
+.port-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); margin-bottom: 24px; }
+.port-kpi-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+
+.port-projects-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 24px; }
+.port-projects-table th {
+  font-family: var(--font-head); font-size: 8px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase; color: var(--white);
+  background: var(--black); padding: 10px 14px; text-align: left; white-space: nowrap;
+}
+.port-projects-table td { padding: 10px 14px; border-bottom: 1px solid var(--alabaster); vertical-align: middle; white-space: nowrap; }
+.port-projects-table tbody tr { cursor: pointer; transition: background 0.1s; }
+.port-projects-table tbody tr:hover { background: #fdf9f5; }
+.port-projects-table .num { text-align: right; font-family: var(--font-mono); font-size: 11px; }
+.port-projects-table .bold { font-weight: 600; }
+.port-projects-table .terra { color: var(--terra); font-weight: 600; }
+
+.fondo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.fondo-card { background: var(--white); border: 1px solid var(--border); padding: 20px 22px; }
+.fondo-name { font-family: var(--font-head); font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--terra); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.fondo-row { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 0; border-bottom: 1px solid var(--alabaster2); }
+.fondo-row:last-child { border-bottom: none; }
+.fondo-key { font-size: 11px; color: var(--muted); }
+.fondo-val { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--graphite); }
+
+/* mini progress bar inside table cell */
+.mini-bar { height: 3px; background: var(--alabaster); width: 80px; display: inline-block; vertical-align: middle; margin-left: 6px; }
+.mini-bar-fill { height: 100%; background: var(--terra); }
 </style>
 </head>
 <body>
@@ -404,19 +457,69 @@ body {
   </div>
 </div>
 
+<!-- PROJECT NAV -->
+<div class="proj-nav" id="proj-nav">
+  <button class="proj-btn active" id="btn-portfolio" onclick="showPortfolio()">
+    Portfolio Consolidado <span class="proj-pill" id="nav-proj-count">0</span>
+  </button>
+</div>
+
 <!-- SUBHEADER -->
 <div class="subheader">
-  <span class="subheader-title">PRY-002 — Mártires 122</span>
+  <span class="subheader-title" id="subheader-title">Portfolio Consolidado</span>
   <div class="subheader-meta">
-    <span class="subheader-item">Ciudad<span>CDMX</span></span>
-    <span class="subheader-item">Unidades<span>15 deptos</span></span>
-    <span class="subheader-item">Horizonte<span>36 meses</span></span>
-    <span class="subheader-item">Fuente<span id="source-label">—</span></span>
+    <span class="subheader-item" id="sh-meta-1">Proyectos<span id="sh-v1">—</span></span>
+    <span class="subheader-item" id="sh-meta-2">Revenue PF<span id="sh-v2">—</span></span>
+    <span class="subheader-item" id="sh-meta-3">LP Equity<span id="sh-v3">—</span></span>
+    <span class="subheader-item">Fuente<span id="source-label">SHEETS</span></span>
     <span class="subheader-item">Actualizado<span id="updated-label">—</span></span>
   </div>
 </div>
 
+<!-- PORTFOLIO VIEW -->
+<div id="view-portfolio" style="display:none">
+  <div class="content">
+
+    <!-- PORTFOLIO KPIs -->
+    <div class="section-label">Portfolio — Resumen Consolidado</div>
+    <div class="port-kpi-grid" id="port-kpi-grid" style="margin-bottom:24px"></div>
+
+    <!-- PROJECTS TABLE -->
+    <div class="section-label">Proyectos Activos</div>
+    <div class="card" style="padding:0;margin-bottom:24px">
+      <div style="overflow-x:auto">
+        <table class="port-projects-table" id="port-projects-table">
+          <thead><tr>
+            <th>ID</th>
+            <th>Proyecto</th>
+            <th>Fondo</th>
+            <th>Tipo</th>
+            <th>Ciudad</th>
+            <th>Status</th>
+            <th class="num">Revenue PF</th>
+            <th class="num">Revenue Real</th>
+            <th class="num">% Ventas</th>
+            <th class="num">Unidades</th>
+            <th class="num">Costo Ejec.</th>
+            <th class="num">% Presup.</th>
+            <th class="num">Avance Obra</th>
+            <th class="num">LP Equity</th>
+            <th class="num">Margen PF</th>
+          </tr></thead>
+          <tbody id="tbody-port-projects"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- POR FONDO -->
+    <div class="section-label">Desglose por Fondo</div>
+    <div class="fondo-grid" id="fondo-grid"></div>
+
+  </div>
+</div>
+
 <!-- CONTENT -->
+<div id="view-project" style="display:none">
 <div class="content">
 
   <!-- MES ACTUAL -->
@@ -818,6 +921,7 @@ body {
   </div><!-- /drill-section -->
 
 </div><!-- /content -->
+</div><!-- /view-project -->
 
 <!-- FOOTER -->
 <div class="footer">
@@ -938,7 +1042,7 @@ function updateSummary(d) {
   document.getElementById('topbar-time').textContent  = new Date(m.updated_at).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
   document.getElementById('source-label').textContent = m.source.toUpperCase();
   document.getElementById('updated-label').textContent= new Date(m.updated_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
-  document.getElementById('footer-src').textContent   = `PRY-002 · ${m.source.toUpperCase()} · Auto-refresh 60s`;
+  document.getElementById('footer-src').textContent   = `${m.proyecto_id||''} · ${m.source.toUpperCase()} · Auto-refresh 60s`;
 
   document.getElementById('mes-num').textContent   = `M${m.mes_actual}`;
   document.getElementById('mes-label').textContent = m.label_actual.toUpperCase();
@@ -1604,57 +1708,204 @@ function buildBVA(bva) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// DATA LOAD
+// MULTI-PROJECT STATE
 // ─────────────────────────────────────────────────────────────
-async function loadData() {
+let _currentPid  = null;   // null = portfolio mode
+let _projects    = [];     // from /api/projects
+
+// ─────────────────────────────────────────────────────────────
+// NAV
+// ─────────────────────────────────────────────────────────────
+async function loadNav() {
   try {
-    const r = await fetch('/api/data');
+    const r = await fetch('/api/projects');
+    _projects = await r.json();
+  } catch(e) { _projects = []; }
+  buildNav();
+  await showPortfolio();
+  document.getElementById('loading').classList.add('hidden');
+}
+
+function buildNav() {
+  document.getElementById('nav-proj-count').textContent = _projects.length;
+  // Remove old project buttons (keep portfolio btn)
+  const nav = document.getElementById('proj-nav');
+  nav.querySelectorAll('.proj-btn.project-btn').forEach(b => b.remove());
+  _projects.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'proj-btn project-btn';
+    btn.id = 'btn-' + p.proyecto_id;
+    btn.onclick = () => showProject(p.proyecto_id);
+    btn.innerHTML = `${p.proyecto_id} <span style="font-weight:300;text-transform:none;letter-spacing:0;font-size:9px;color:#666"> — ${p.nombre || ''}</span>`;
+    nav.appendChild(btn);
+  });
+}
+
+function setNavActive(id) {
+  document.querySelectorAll('.proj-btn').forEach(b => b.classList.remove('active'));
+  const el = document.getElementById('btn-' + id);
+  if (el) el.classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────────────
+// PORTFOLIO VIEW
+// ─────────────────────────────────────────────────────────────
+async function showPortfolio() {
+  _currentPid = null;
+  setNavActive('portfolio');
+  document.getElementById('view-portfolio').style.display = 'block';
+  document.getElementById('view-project').style.display = 'none';
+  document.getElementById('subheader-title').textContent = 'Portfolio Consolidado';
+
+  try {
+    const r = await fetch('/api/portfolio');
+    const data = await r.json();
+    renderPortfolio(data);
+    const now = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+    document.getElementById('updated-label').textContent = now;
+    document.getElementById('sh-v1').textContent = (data.kpis?.total_proyectos || 0) + ' proyectos';
+    document.getElementById('sh-v2').textContent = fmtM(data.kpis?.revenue_proforma || 0);
+    document.getElementById('sh-v3').textContent = fmtM(data.kpis?.lp_equity_total || 0);
+  } catch(e) { console.error('Error cargando portfolio:', e); }
+}
+
+function renderPortfolio(data) {
+  const k = data.kpis || {};
+
+  // KPI Grid
+  const kpis = [
+    {label:'Total Proyectos',    value: k.total_proyectos || 0,           sub: _projects.length + ' en registry'},
+    {label:'Revenue Proforma',   value: fmtM(k.revenue_proforma||0),      sub: fmtP(k.pct_revenue||0) + ' firmado', cls:'accent'},
+    {label:'Revenue Firmado',    value: fmtM(k.revenue_firmado||0),        sub: fmtP(k.pct_revenue||0) + ' del modelo', cls:'success'},
+    {label:'Costo Ejecutado',    value: fmtM(k.costo_ejecutado||0),        sub: fmtP(k.pct_costos||0) + ' del presupuesto'},
+    {label:'LP Equity Total',    value: fmtM(k.lp_equity_total||0),        sub: fmtM(k.lp_equity_recibido||0) + ' recibido', cls:'accent'},
+    {label:'Unidades Firmadas',  value: (k.total_unidades_firm||0) + ' / ' + (k.total_unidades_pf||0), sub: fmtP(k.pct_absorcion||0) + ' absorción'},
+    {label:'Margen Bruto Total', value: fmtM(k.margen_bruto_total||0),     sub: fmtP(k.pct_margen||0) + ' del revenue', cls:'success'},
+    {label:'Cobranza Total',     value: fmtM(k.cobranza_total||0),          sub: 'efectivo cobrado'},
+  ];
+  document.getElementById('port-kpi-grid').innerHTML = kpis.map(c => `
+    <div class="kpi-cell">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value ${c.cls||''}">${c.value}</div>
+      <div class="kpi-sub">${c.sub||''}</div>
+    </div>`).join('');
+
+  // Projects table
+  const rows = data.proyectos || [];
+  document.getElementById('tbody-port-projects').innerHTML = rows.length === 0
+    ? '<tr><td colspan="15" class="tbl-empty">Sin proyectos en el portfolio</td></tr>'
+    : rows.map(p => {
+        const pct = p.pct_ventas || 0;
+        return `<tr onclick="showProject('${p.proyecto_id}')">
+          <td class="bold terra">${safe(p.proyecto_id)}</td>
+          <td class="bold">${safe(p.nombre)}</td>
+          <td>${safe(p.fondo)}</td>
+          <td>${safe(p.tipo_activo)}</td>
+          <td>${safe(p.ciudad)}</td>
+          <td>${badge(p.status)}</td>
+          <td class="num">${fmtM(p.revenue_pf)}</td>
+          <td class="num terra">${fmtM(p.revenue_real)}</td>
+          <td class="num">${fmtPct(pct)}<span class="mini-bar"><span class="mini-bar-fill" style="width:${Math.min(pct,100)}%;display:block;height:100%;background:var(--terra)"></span></span></td>
+          <td class="num">${safe(p.unidades)}</td>
+          <td class="num">${fmtM(p.costo_ejec)}</td>
+          <td class="num">${fmtPct(p.pct_presup||0)}</td>
+          <td class="num">${fmtPct(p.avance_obra||0)}</td>
+          <td class="num">${fmtM(p.lp_equity)}</td>
+          <td class="num">${fmtM(p.margen_pf)}</td>
+        </tr>`;
+      }).join('');
+
+  // Por fondo
+  const pf = data.por_fondo || {};
+  const fondoKeys = Object.keys(pf);
+  document.getElementById('fondo-grid').innerHTML = fondoKeys.length === 0
+    ? '<div class="card"><div class="tbl-empty">Sin datos de fondos</div></div>'
+    : fondoKeys.map(f => {
+        const fd = pf[f];
+        return `<div class="fondo-card">
+          <div class="fondo-name">${f}</div>
+          <div class="fondo-row"><span class="fondo-key">Proyectos</span><span class="fondo-val">${fd.proyectos}</span></div>
+          <div class="fondo-row"><span class="fondo-key">Revenue PF</span><span class="fondo-val">${fmtM(fd.revenue_pf)}</span></div>
+          <div class="fondo-row"><span class="fondo-key">Revenue Real</span><span class="fondo-val">${fmtM(fd.revenue_real)}</span></div>
+          <div class="fondo-row"><span class="fondo-key">LP Equity</span><span class="fondo-val">${fmtM(fd.lp_equity)}</span></div>
+          <div class="fondo-row"><span class="fondo-key">Costo Ejecutado</span><span class="fondo-val">${fmtM(fd.costo_ejecutado)}</span></div>
+        </div>`;
+      }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// PROJECT VIEW
+// ─────────────────────────────────────────────────────────────
+async function showProject(pid) {
+  _currentPid = pid;
+  setNavActive(pid);
+  document.getElementById('view-portfolio').style.display = 'none';
+  document.getElementById('view-project').style.display = 'block';
+
+  const proj = _projects.find(p => p.proyecto_id === pid);
+  document.getElementById('subheader-title').textContent = proj
+    ? `${pid} — ${proj.nombre || ''}` : pid;
+
+  document.getElementById('sh-meta-1').innerHTML = `Ciudad<span id="sh-v1">${proj?.ciudad||'—'}</span>`;
+  document.getElementById('sh-meta-2').innerHTML = `Tipo<span id="sh-v2">${proj?.tipo_activo||'—'}</span>`;
+  document.getElementById('sh-meta-3').innerHTML = `Fondo<span id="sh-v3">${proj?.fondo||'—'}</span>`;
+
+  try {
+    const r = await fetch(`/api/proyecto/${pid}`);
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
-
-    updateSummary(d);
-
-    // Store detail data for drawer
-    const det = d.detail || {};
-    _detailData = {
-      capital:     det.capital_calls || [],
-      ventas:      det.ventas        || [],
-      cobranza:    det.cobranza      || [],
-      gastos:      det.gastos        || [],
-      presupuesto: det.presupuesto   || [],
-      obra:        det.avance        || [],
-      hitos:       det.hitos         || [],
-      deuda:       det.deuda         || [],
-    };
-
-    // Build tables
-    buildCapital(_detailData.capital);
-    buildVentas(_detailData.ventas);
-    buildCobranza(_detailData.cobranza);
-    buildGastos(_detailData.gastos);
-    buildPresupuesto(_detailData.presupuesto);
-    buildObra(_detailData.obra);
-    buildHitos(_detailData.hitos);
-    buildBVA(d.bva || {});
-    document.getElementById('cnt-deuda').textContent = 0;
-
-    document.getElementById('loading').classList.add('hidden');
+    renderProject(d);
   } catch(e) {
-    console.error('Error cargando datos:', e);
+    console.error('Error cargando proyecto:', e);
   }
 }
 
+function renderProject(d) {
+  updateSummary(d);
+  const det = d.detail || {};
+  _detailData = {
+    capital:     det.capital_calls || [],
+    ventas:      det.ventas        || [],
+    cobranza:    det.cobranza      || [],
+    gastos:      det.gastos        || [],
+    presupuesto: det.presupuesto   || [],
+    obra:        det.avance        || [],
+    hitos:       det.hitos         || [],
+    deuda:       det.deuda         || [],
+  };
+  buildCapital(_detailData.capital);
+  buildVentas(_detailData.ventas);
+  buildCobranza(_detailData.cobranza);
+  buildGastos(_detailData.gastos);
+  buildPresupuesto(_detailData.presupuesto);
+  buildObra(_detailData.obra);
+  buildHitos(_detailData.hitos);
+  buildBVA(d.bva || {});
+  document.getElementById('cnt-deuda').textContent = 0;
+  document.getElementById('updated-label').textContent = new Date(d.meta.updated_at).toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+}
+
+// ─────────────────────────────────────────────────────────────
+// REFRESH
+// ─────────────────────────────────────────────────────────────
 async function refresh() {
   try { await fetch('/api/refresh', {method:'POST'}); } catch(e){}
-  await loadData();
+  if (_currentPid) {
+    await showProject(_currentPid);
+  } else {
+    await showPortfolio();
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────────────────────
 initCharts();
-loadData();
-setInterval(loadData, 60000);
+loadNav();
+setInterval(() => {
+  if (_currentPid) showProject(_currentPid);
+  else showPortfolio();
+}, 60000);
 </script>
 </body>
 </html>
