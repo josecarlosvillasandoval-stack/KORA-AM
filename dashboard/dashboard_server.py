@@ -31,7 +31,7 @@ def _resolve_sa_file():
             return tmp.name
         except Exception as e:
             print(f'  ⚠ Error decodificando SA_JSON_B64: {e}')
-    return os.getenv('SA_FILE', '/Users/jcvs/Desktop/kora-am-platform/secrets/kora-service-account.json')
+    return os.getenv('SA_FILE', '/Users/jcvs/Desktop/KORA AM/kora-am-platform/secrets/kora-service-account.json')
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 PORT             = int(os.getenv('PORT', 5002))
